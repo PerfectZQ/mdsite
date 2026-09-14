@@ -8,7 +8,7 @@ import { createPreview } from './preview.ts'
 const help = `mdsite — Markdown 所在的目录，就是文档目录。
 
   mdsite serve [目录] [选项]  本地预览，刷新时读取最新文件
-  mdsite build [目录] [选项]  生成可离线打开的静态 HTML
+  mdsite build [目录] [选项]  生成静态 HTML，内容未变时保留原文件
   mdsite version            查看版本
 
 选项：
@@ -53,6 +53,13 @@ async function run(args: string[]) {
     const output = resolve(values.output ?? 'dist/index.html')
     if (!['.html', '.htm'].includes(extname(output).toLowerCase())) throw new Error('输出必须使用 .html 或 .htm 文件，不能覆盖 Markdown')
     const page = await createPage(directory, options)
+    const previous = await readFile(output, 'utf8').catch(error => {
+      if (error.code !== 'ENOENT') throw error
+    })
+    if (previous === page) {
+      console.log(`内容未变，保留 ${output}`)
+      return
+    }
     await mkdir(dirname(output), { recursive: true })
     const stage = await mkdtemp(join(dirname(output), '.mdsite-'))
     try {

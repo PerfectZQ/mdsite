@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -153,6 +153,47 @@ test('CLI builds outside its package, validates arguments, and preserves previou
   }
   assert.equal(await readFile(join(root, 'existing.html'), 'utf8'), 'previous output')
   assert.equal(await readFile(join(root, 'README.md'), 'utf8'), '# CLI project')
+})
+
+test('CLI refreshes changed resources and preserves unchanged output timestamps', async t => {
+  const root = await fixture(t, { 'README.md': '# Before\n\n![image](picture.svg)', 'picture.svg': '<svg/>' })
+  const output = join(root, 'public/docs/index.html')
+  const run = (...options) => exec(process.execPath, [cli, 'build', '.', '-o', output, ...options], { cwd: root })
+  const page = () => readFile(output, 'utf8')
+  const documents = async () => catalogFromPage(await page()).documents
+  await run()
+  const original = await page()
+  await utimes(output, 1, 1)
+  await writeFile(join(root, 'unrelated.ts'), '// Not documentation')
+  assert.match((await run()).stdout, /内容未变/)
+  assert.equal((await stat(output)).mtimeMs, 1000)
+
+  await writeFile(join(root, 'picture.svg'), '<svg><title>Updated image</title></svg>')
+  await run()
+  assert.notEqual(await page(), original)
+  assert.ok((await documents())[0].html.includes(Buffer.from('<svg><title>Updated image</title></svg>').toString('base64')))
+  await writeFile(join(root, 'README.md'), '# After')
+  await writeFile(join(root, 'extra.md'), '# Extra')
+  await run()
+  assert.deepEqual((await documents()).map(doc => doc.title), ['After', 'Extra'])
+  await rename(join(root, 'extra.md'), join(root, 'moved.md'))
+  await run()
+  assert.deepEqual((await documents()).map(doc => doc.path), ['README.md', 'moved.md'])
+  await writeFile(join(root, '.mdignore'), 'moved.md')
+  await run()
+  assert.deepEqual((await documents()).map(doc => doc.path), ['README.md'])
+  await rm(join(root, '.mdignore'))
+  await rm(join(root, 'moved.md'))
+  await run('--title', 'Changed title')
+  const expected = await page()
+  assert.equal(catalogFromPage(expected).title, 'Changed title')
+  assert.deepEqual((await documents()).map(doc => doc.path), ['README.md'])
+  await writeFile(output, 'Damaged output')
+  await run('--title', 'Changed title')
+  assert.equal(await page(), expected)
+  await rm(output)
+  await run('--title', 'Changed title')
+  assert.equal(await page(), expected)
 })
 
 test('ignore matching agrees with Git across patterns and directory pruning', async t => {

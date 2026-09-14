@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -25,15 +25,45 @@ try {
   const cli = join(installed, pkg.bin.mdsite)
   const run = (args: string[]) => execFileSync(process.execPath, [cli, ...args], { cwd: sandbox, encoding: 'utf8' })
   assert.equal(run(['version']).trim(), `mdsite ${expected.version}`)
-  for (const file of ['README.md', 'getstart.md', 'CONTRIBUTING.md']) await readFile(join(installed, file))
+  for (const file of ['README.md', 'QUICK_START.md', 'CONTRIBUTING.md']) await readFile(join(installed, file))
 
   await mkdir(join(sandbox, 'content'))
   await writeFile(join(sandbox, 'content/README.md'), '# Package check\n\n独立安装验证\n\n```mermaid\ngraph LR\nA-->B\n```\n')
   run(['build', 'content', '-o', 'public/docs/index.html'])
-  const page = await readFile(join(sandbox, 'public/docs/index.html'), 'utf8')
+  const output = join(sandbox, 'public/docs/index.html')
+  let page = await readFile(output, 'utf8')
   const catalog = JSON.parse(page.split('<script id="documentation" type="application/json">')[1].split('</script>')[0])
   assert.equal(catalog.documents[0].title, 'Package check')
   assert.match(page, /mdsiteMermaid=/)
+  await utimes(output, 1, 1)
+  assert.match(run(['build', 'content', '-o', output]), /内容未变/)
+  assert.equal((await stat(output)).mtimeMs, 1000)
+
+  // An upgraded reader must refresh output even when Markdown is unchanged.
+  const css = join(installed, 'dist/assets/site.css')
+  await writeFile(css, `${await readFile(css, 'utf8')}\n/* reader upgrade check */`)
+  run(['build', 'content', '-o', output])
+  page = await readFile(output, 'utf8')
+  assert.match(page, /reader upgrade check/)
+
+  const script = join(installed, 'examples/build-with-docs.sh')
+  const buildService = join(sandbox, 'build-service.cjs')
+  const serviceOutput = join(sandbox, 'service.txt')
+  await writeFile(buildService, `const fs = require('node:fs'); fs.copyFileSync(process.env.MDSITE_OUTPUT, ${JSON.stringify(serviceOutput)}); process.stdout.write(process.argv[2]);`)
+  const scriptOptions = {
+    cwd: join(sandbox, 'content'), encoding: 'utf8' as const,
+    env: { ...process.env, PATH: `${join(sandbox, 'node_modules/.bin')}:${process.env.PATH}`, MDSITE_OUTPUT: join(sandbox, 'custom assets/docs.html') },
+  }
+  assert.match(execFileSync('sh', [script, process.execPath, buildService, 'argument with spaces'], scriptOptions), /argument with spaces/)
+  assert.equal(await readFile(serviceOutput, 'utf8'), page)
+  assert.throws(() => execFileSync('sh', [script, process.execPath, '-e', 'process.exit(7)'], scriptOptions), { status: 7 })
+  await rm(serviceOutput)
+  await mkdir(join(sandbox, 'content/.mdignore'))
+  assert.throws(() => execFileSync('sh', [script, process.execPath, buildService], { ...scriptOptions, stdio: 'pipe' }), { status: 1 })
+  await assert.rejects(readFile(serviceOutput), { code: 'ENOENT' })
+  assert.equal(await readFile(scriptOptions.env.MDSITE_OUTPUT, 'utf8'), page)
+  assert.throws(() => execFileSync('sh', [script], { ...scriptOptions, stdio: 'pipe' }), { status: 2 })
+  await rm(join(sandbox, 'content/.mdignore'), { recursive: true })
 
   const server = spawn(process.execPath, [cli, 'serve', 'content', '--addr', '127.0.0.1:0'], { cwd: sandbox, stdio: ['ignore', 'pipe', 'inherit'] })
   const exited = once(server, 'exit')

@@ -63,10 +63,10 @@ jobs:
           \`\`\`sh
           npm install -g https://github.com/${GH_REPO}/releases/download/${RELEASE_TAG}/mdsite.tgz
           mdsite version
-          mdsite serve .
+          mdsite build . -o public/docs/index.html
           \`\`\`
 
-          使用说明：https://github.com/${GH_REPO}/blob/${RELEASE_TAG}/getstart.md
+          使用说明：https://github.com/${GH_REPO}/blob/${RELEASE_TAG}/QUICK_START.md
           EOF
           gh release create "$RELEASE_TAG" mdsite.tgz mdsite.tgz.sha256 \
             --verify-tag --draft --title "$RELEASE_TAG" --notes-file release-notes.md
