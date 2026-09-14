@@ -3,6 +3,11 @@
   "version": "0.2.0",
   "description": "Turn Markdown in any project into a searchable, self-contained documentation UI.",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerfectZQ/mdsite.git"
+  },
+  "homepage": "https://github.com/PerfectZQ/mdsite#readme",
   "type": "module",
   "bin": {
     "mdsite": "dist/cli.js"

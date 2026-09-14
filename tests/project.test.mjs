@@ -143,7 +143,8 @@ test('preview refreshes files and ignore rules, and serves only the generated UI
 test('CLI builds outside its package, validates arguments, and preserves previous output on failure', async t => {
   const root = await fixture(t, { 'README.md': '# CLI project', 'existing.html': 'previous output' })
   const run = args => exec(process.execPath, [cli, ...args], { cwd: root })
-  assert.match((await run(['version'])).stdout, /mdsite 0\.2\.0/)
+  const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+  assert.equal((await run(['version'])).stdout.trim(), `mdsite ${version}`)
   assert.match((await run(['--help'])).stdout, /mdsite build/)
   await run(['build', '.', '--title', 'Custom', '-o', 'nested/docs.html'])
   assert.equal(catalogFromPage(await readFile(join(root, 'nested/docs.html'), 'utf8')).title, 'Custom')

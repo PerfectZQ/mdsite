@@ -4,25 +4,30 @@
 
 mdsite 将项目中的 Markdown 生成为可浏览、检索的文档 UI。使用前准备 Node.js 24+；生成的 HTML 可以离线打开，托管时无需 Node 服务。
 
-## 安装
+## 安装和更新
 
-当前版本通过 npm 发行包安装。在收到的发行包所在目录执行：
+从 GitHub Releases 公网下载并安装最新正式版：
 
 ```sh
-npm install -g ./mdsite-0.2.0.tgz
+npm install -g https://github.com/PerfectZQ/mdsite/releases/latest/download/mdsite.tgz
 mdsite version
 ```
 
-安装后可在任意项目中使用，无需下载 mdsite 源码或自行编译。
+更新时再次执行同一条安装命令即可。无需 GitHub 或 npm 账号，无需手动下载文件，也无需获取源码或自行编译。
 
-包发布到 npm 后，也可以直接运行：
+需要固定版本时，在 URL 中指定版本标签，例如：
 
 ```sh
-npx mdsite@latest serve .
-npx mdsite@latest build .
+npm install -g https://github.com/PerfectZQ/mdsite/releases/download/v0.2.0/mdsite.tgz
 ```
 
-通过 npm 全局安装使用 `npm install -g mdsite`；需要固定为业务项目的构建依赖时使用 `npm install -D mdsite`，再通过 `npx mdsite` 执行命令。
+也可以只运行一次，不全局安装：
+
+```sh
+npx --yes --package=https://github.com/PerfectZQ/mdsite/releases/latest/download/mdsite.tgz mdsite serve .
+```
+
+[版本列表](https://github.com/PerfectZQ/mdsite/releases)提供各版本的安装包和 SHA-256 校验文件。npm 在这里作为安装工具，mdsite 的发行包由 GitHub 托管。
 
 ## 首次使用
 
@@ -37,7 +42,6 @@ mdsite build . -o public/docs/index.html   # 放入业务项目的静态资源�
 无需初始化或登记文档。将 Markdown 放在合适的目录中，mdsite 自动生成文件树、正文和搜索内容。
 
 ## 命令
-
 
 ```sh
 mdsite serve [目录] [--addr 127.0.0.1:6060] [--title 名称] [--exclude 路径]
