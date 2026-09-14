@@ -1,94 +1,40 @@
-import {useEffect, useMemo, useRef, useState} from 'react'
+import {useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent} from 'react'
 import {documentHref} from './navigation'
+import {Icon} from './Icon'
 import type {Catalog} from '../catalog.ts'
 
-interface Directory {
+interface Entry {
     path: string
     name: string
-    folders: Map<string, Directory>
-    files: string[]
+    folder: boolean
+    children: Entry[]
 }
 
 function directoryTree(paths: string[]) {
-    const root: Directory = {path: '', name: '', folders: new Map(), files: []}
-    for (const path of paths.sort((left, right) => left.localeCompare(right, 'en'))) {
+    const root: Entry = {path: '', name: '', folder: true, children: []}
+    for (const path of [...new Set(paths)].sort((a, b) => a.localeCompare(b, 'en'))) {
         const parts = path.split('/')
-        parts.pop()
-        let current = root
-        for (const name of parts) {
-            if (!current.folders.has(name)) {
-                current.folders.set(name, {
+        let parent = root
+        parts.forEach((name, index) => {
+            let entry = parent.children.find(child => child.name === name)
+            if (!entry) {
+                entry = {
+                    path: parts.slice(0, index + 1).join('/'),
                     name,
-                    path: current.path ? `${current.path}/${name}` : name,
-                    folders: new Map(),
-                    files: [],
-                })
+                    folder: index < parts.length - 1,
+                    children: [],
+                }
+                parent.children.push(entry)
             }
-            current = current.folders.get(name)!
-        }
-        current.files.push(path)
+            parent = entry
+        })
     }
     return root
 }
 
-type TreeProps = {
-    directory: Directory
-    selected: string
-    revealedDirectory: string
-    onNavigate: () => void
-}
-
-function Tree({directory, selected, revealedDirectory, onNavigate}: TreeProps) {
-    return (
-        <ul className="nav-tree">
-            {[...directory.folders.values()].map(folder => (
-                <Folder
-                    key={folder.path}
-                    directory={folder}
-                    selected={selected}
-                    revealedDirectory={revealedDirectory}
-                    onNavigate={onNavigate}
-                />
-            ))}
-            {directory.files.map(path => (
-                <li key={path}>
-                    <a
-                        href={documentHref(path)}
-                        title={path}
-                        aria-current={selected === path ? 'page' : undefined}
-                        onClick={onNavigate}
-                    >
-                        <span className="file-mark" aria-hidden="true">
-                            ▤
-                        </span>
-                        <span>{path.split('/').at(-1)}</span>
-                    </a>
-                </li>
-            ))}
-        </ul>
-    )
-}
-
-function Folder(props: TreeProps) {
-    const {directory, selected, revealedDirectory} = props
-    const active =
-        selected.startsWith(`${directory.path}/`) ||
-        revealedDirectory === directory.path ||
-        revealedDirectory.startsWith(`${directory.path}/`)
-    const [open, setOpen] = useState(active)
-    useEffect(() => {
-        if (active) setOpen(true)
-    }, [active, selected, revealedDirectory])
-    return (
-        <li>
-            <details open={open} onToggle={event => setOpen(event.currentTarget.open)}>
-                <summary className="folder-name" data-directory-path={directory.path}>
-                    {directory.name}/
-                </summary>
-                <Tree {...props} />
-            </details>
-        </li>
-    )
+function ancestors(path: string) {
+    const parts = path.split('/')
+    return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'))
 }
 
 export function Navigation({
@@ -99,38 +45,177 @@ export function Navigation({
 }: {
     catalog: Catalog
     selected: string
-    revealedDirectory: string
+    revealedDirectory: {path: string} | null
     onNavigate?: () => void
 }) {
     const navigation = useRef<HTMLElement>(null)
+    const revealFocus = useRef('')
+    const [open, setOpen] = useState(() => new Set(ancestors(selected)))
+    const [focused, setFocused] = useState(selected)
     const directory = useMemo(
         () => directoryTree([...catalog.documents.map(document => document.path), ...Object.keys(catalog.aliases)]),
         [catalog],
     )
+    const rows: (Entry & {depth: number; position: number; size: number})[] = []
+    const visit = (parent: Entry, depth: number) => {
+        const children = [...parent.children].sort((a, b) => Number(b.folder) - Number(a.folder))
+        children.forEach((entry, index) => {
+            rows.push({...entry, depth, position: index + 1, size: children.length})
+            if (entry.folder && open.has(entry.path)) visit(entry, depth + 1)
+        })
+    }
+    visit(directory, 1)
+    const focusPath = rows.some(row => row.path === focused) ? focused : rows[0]?.path
+
+    useEffect(() => {
+        setOpen(previous => new Set([...previous, ...ancestors(selected)]))
+        setFocused(selected)
+    }, [selected])
     useEffect(() => {
         if (!revealedDirectory) return
-        // 目录链接只展开真实文件树，不生成第二套目录首页。
+        const {path} = revealedDirectory
+        revealFocus.current = path
+        setOpen(previous => new Set([...previous, ...ancestors(path), path]))
+        setFocused(path)
+    }, [revealedDirectory])
+    useEffect(() => {
+        if (!revealFocus.current) return
         const frame = requestAnimationFrame(() => {
-            if (!navigation.current?.checkVisibility()) return
-            const folder = [...navigation.current.querySelectorAll<HTMLElement>('[data-directory-path]')].find(
-                element => element.dataset.directoryPath === revealedDirectory,
+            const element = [...navigation.current!.querySelectorAll<HTMLElement>('[data-path]')].find(
+                row => row.dataset.path === revealFocus.current,
             )
-            folder?.scrollIntoView({block: 'nearest'})
-            folder?.focus({preventScroll: true})
+            if (element?.checkVisibility()) {
+                element.scrollIntoView({block: 'nearest'})
+                element.focus({preventScroll: true})
+                revealFocus.current = ''
+            }
         })
         return () => cancelAnimationFrame(frame)
-    }, [revealedDirectory])
+    }, [open])
+
+    const toggle = (path: string) =>
+        setOpen(previous => {
+            const next = new Set(previous)
+            if (next.has(path)) next.delete(path)
+            else next.add(path)
+            return next
+        })
+    const keyboard = (event: KeyboardEvent<HTMLElement>, entry: Entry, index: number) => {
+        let next = index
+        switch (event.key) {
+            case 'ArrowDown':
+                next = Math.min(rows.length - 1, index + 1)
+                break
+            case 'ArrowUp':
+                next = Math.max(0, index - 1)
+                break
+            case 'Home':
+                next = 0
+                break
+            case 'End':
+                next = rows.length - 1
+                break
+            case 'ArrowRight':
+                if (!entry.folder) return
+                if (!open.has(entry.path)) toggle(entry.path)
+                else next = Math.min(rows.length - 1, index + 1)
+                break
+            case 'ArrowLeft':
+                if (entry.folder && open.has(entry.path)) toggle(entry.path)
+                else {
+                    const parent = ancestors(entry.path).at(-1)
+                    const parentIndex = rows.findIndex(row => row.path === parent)
+                    if (parentIndex >= 0) next = parentIndex
+                }
+                break
+            case ' ':
+            case 'Enter':
+                if (entry.folder) toggle(entry.path)
+                else {
+                    window.location.hash = documentHref(entry.path)
+                    onNavigate()
+                }
+                break
+            default:
+                return
+        }
+        event.preventDefault()
+        const path = rows[next]?.path
+        if (path) {
+            setFocused(path)
+            navigation.current?.querySelectorAll<HTMLElement>('[role="treeitem"]')[next]?.focus()
+        }
+    }
     return (
         <nav ref={navigation} aria-label="文档导航">
-            <a className="root-directory" href="#/" onClick={onNavigate}>
-                {catalog.rootName}/
-            </a>
-            <Tree
-                directory={directory}
-                selected={selected}
-                revealedDirectory={revealedDirectory}
-                onNavigate={onNavigate}
-            />
+            <div className="tree-heading">
+                <a className="root-directory" href="#/" onClick={onNavigate} title={catalog.rootName}>
+                    <Icon name="folder" />
+                    <span>{catalog.rootName}</span>
+                </a>
+                <button
+                    className="tree-collapse"
+                    title="折叠所有目录"
+                    aria-label="折叠所有目录"
+                    onClick={() => {
+                        setOpen(new Set())
+                        setFocused(directory.children[0]?.path || '')
+                    }}
+                >
+                    <Icon name="collapse" />
+                </button>
+            </div>
+            <div className="nav-tree" role="tree" aria-label="项目文件">
+                {rows.map((entry, index) => {
+                    const props = {
+                        className: `tree-row${entry.folder ? ' tree-folder' : ' tree-file'}`,
+                        role: 'treeitem',
+                        'aria-level': entry.depth,
+                        'aria-posinset': entry.position,
+                        'aria-setsize': entry.size,
+                        'aria-selected': selected === entry.path,
+                        tabIndex: focusPath === entry.path ? 0 : -1,
+                        'data-path': entry.path,
+                        title: entry.path,
+                        style: {'--depth': entry.depth - 1} as CSSProperties,
+                        onFocus: () => setFocused(entry.path),
+                        onKeyDown: (event: KeyboardEvent<HTMLElement>) => keyboard(event, entry, index),
+                    }
+                    const content = (
+                        <>
+                            <span className="tree-indent" aria-hidden="true">
+                                {Array.from({length: entry.depth - 1}, (_, index) => (
+                                    <i key={index} />
+                                ))}
+                            </span>
+                            <span className="tree-chevron">{entry.folder && <Icon name="chevron" />}</span>
+                            <Icon name={entry.folder ? 'folder' : 'markdown'} />
+                            <span className="tree-name">{entry.name}</span>
+                        </>
+                    )
+                    return entry.folder ? (
+                        <button
+                            {...props}
+                            type="button"
+                            key={entry.path}
+                            aria-expanded={open.has(entry.path)}
+                            onClick={() => toggle(entry.path)}
+                        >
+                            {content}
+                        </button>
+                    ) : (
+                        <a
+                            {...props}
+                            key={entry.path}
+                            href={documentHref(entry.path)}
+                            aria-current={selected === entry.path ? 'page' : undefined}
+                            onClick={onNavigate}
+                        >
+                            {content}
+                        </a>
+                    )
+                })}
+            </div>
         </nav>
     )
 }

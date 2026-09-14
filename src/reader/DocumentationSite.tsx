@@ -16,7 +16,7 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
     const content = useRef<HTMLElement>(null)
     const selectedPath = route.path || catalog.home
     const documentPath = catalog.aliases[selectedPath] || selectedPath
-    const [revealedDirectory, setRevealedDirectory] = useState('')
+    const [revealedDirectory, setRevealedDirectory] = useState<{path: string} | null>(null)
     const current = useMemo(
         () => catalog.documents.find(document => document.path === documentPath),
         [catalog, documentPath],
@@ -87,7 +87,7 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
 
     const onSourceLink = (path: string, isDirectory: boolean) => {
         if (isDirectory && catalog.documents.some(document => document.path.startsWith(path))) {
-            setRevealedDirectory(path.replace(/\/$/, ''))
+            setRevealedDirectory({path: path.replace(/\/$/, '')})
             if (window.matchMedia('(max-width: 960px)').matches) mobileNavigation.current?.showModal()
             return
         }

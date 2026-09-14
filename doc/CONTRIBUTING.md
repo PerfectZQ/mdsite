@@ -42,7 +42,14 @@ npm test
 
 `npm run check` 对 CLI、阅读器和构建脚本进行类型检查。`npm test` 会先构建 CLI 和阅读器，再验证文件扫描、Markdown 渲染、预览刷新、命令行、构建变更检测、链接、图片、忽略规则与搜索。Git 可用时，测试会以 Git 的实际结果核对忽略规则；运行 mdsite 本身不依赖 Git。
 
-修改阅读器或生成页面时，应检查生成 HTML 的独立使用、桌面和移动端表现；涉及 Mermaid 时，同时检查包含和不包含图表的文档。
+修改阅读器或生成页面时，执行浏览器回归测试（本机默认使用已安装的 Chrome，CI 使用 Chromium）：
+
+```sh
+npm run build
+npm run test:reader
+```
+
+测试覆盖代码复制和换行、多行高亮、文件树键盘导航、目录链接、Mermaid 明暗主题/缩放/全屏/下载/错误恢复、390px 移动端、减少动态效果、章节定位与断网阅读。发布工作流在安装包验证后执行相同测试。视觉修改还需检查桌面和移动端截图。
 
 ## 工程结构
 
@@ -78,8 +85,9 @@ examples/content/      # Markdown 示例
 1. 核对标签、`package.json` 和 `package-lock.json` 中的版本一致；当前只接受 `v主版本.次版本.修订版本` 格式的正式版本。
 2. 使用 Node.js 24 执行 `npm ci` 和 `npm pack`，完成类型检查、自动格式化、构建和测试。
 3. 在独立目录安装并验证生成的发行包。
-4. 将发行包统一命名为 `mdsite.tgz`，生成 `mdsite.tgz.sha256`。
-5. 创建带完整附件的 Release 草稿，再发布并标记为 Latest。
+4. 在 Chromium 中验证阅读器交互、明暗主题、移动端和离线阅读。
+5. 将发行包统一命名为 `mdsite.tgz`，生成 `mdsite.tgz.sha256`。
+6. 创建带完整附件的 Release 草稿，再发布并标记为 Latest。
 
 工作流使用 GitHub 自动提供的 `GITHUB_TOKEN`，发布任务仅申请 `contents: write`，无需额外配置 Secret。仓库需要保持 Public 且启用 Actions，用户才能匿名下载发行文件。首次推送工作流时，维护者使用的 GitHub 凭据需要有更新工作流的权限。
 
@@ -113,12 +121,12 @@ mdsite build . -o dist/docs.html
 mdsite serve .
 ```
 
-Latest 地址始终指向最新正式版；需要可复现构建时，将 `latest/download` 换成 `download/v0.2.4` 等固定版本路径。
+Latest 地址始终指向最新正式版；需要可复现构建时，将 `latest/download` 换成 `download/v0.2.5` 等固定版本路径。
 
 也可以从公网 URL 执行完整的安装包验证，脚本会核对发行包版本与当前源码版本一致：
 
 ```sh
-node scripts/verify-package.ts https://github.com/PerfectZQ/mdsite/releases/download/v0.2.4/mdsite.tgz
+node scripts/verify-package.ts https://github.com/PerfectZQ/mdsite/releases/download/v0.2.5/mdsite.tgz
 ```
 
 `verify-package.ts` 在临时目录中用独立 npm 缓存安装线上发行包，禁用安装脚本，只安装运行依赖，再验证 `version`、`build`（含自定义输出路径、变更检测和失败时保留产物）、`serve`、随包文档和内联 Mermaid；结束后自动清理。脚本支持 macOS / Linux，GitHub Actions 在 Linux 上使用同一脚本验证待发布的包。

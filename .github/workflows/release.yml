@@ -47,6 +47,10 @@ jobs:
           mv "$RUNNER_TEMP/mdsite-${version}.tgz" "$RUNNER_TEMP/mdsite.tgz"
       - name: Verify installed package
         run: node scripts/verify-package.ts "$RUNNER_TEMP/mdsite.tgz"
+      - name: Verify reader in Chromium
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:reader
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,0 +1,113 @@
+.tree-heading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 4px 16px;
+}
+.root-directory {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    flex: 1;
+    padding: 7px 6px;
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 650;
+}
+.root-directory span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.root-directory .icon {
+    color: var(--muted);
+}
+.tree-collapse {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    color: var(--muted);
+}
+.nav-tree {
+    margin: 0;
+}
+.tree-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 30px;
+    padding: 5px 8px 5px calc(5px + var(--depth) * 16px);
+    margin: 1px 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 12.5px;
+    line-height: 20px;
+    text-align: left;
+}
+.tree-row:hover {
+    color: var(--ink);
+    background: var(--surface);
+}
+.tree-row[aria-selected='true'] {
+    background: var(--blue-soft);
+    color: var(--blue);
+}
+.tree-row:focus-visible {
+    outline-offset: -2px;
+}
+.tree-chevron {
+    display: grid;
+    place-items: center;
+    flex: 0 0 12px;
+    width: 12px;
+}
+.tree-chevron .icon {
+    width: 12px;
+    height: 12px;
+    color: var(--muted);
+}
+.tree-row[aria-expanded='true'] .tree-chevron {
+    transform: rotate(90deg);
+}
+.tree-row > .icon-folder {
+    color: var(--muted);
+}
+.tree-row > .icon-markdown {
+    color: var(--blue);
+    opacity: 0.85;
+}
+.tree-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tree-indent {
+    display: flex;
+    position: absolute;
+    inset: 0 auto 0 10px;
+    pointer-events: none;
+}
+.tree-indent i {
+    display: block;
+    width: 16px;
+    border-left: 1px solid var(--line);
+    opacity: 0.35;
+}
+@media (max-width: 960px) {
+    .navigation-dialog .tree-row {
+        min-height: 44px;
+    }
+    .tree-collapse {
+        width: 44px;
+        height: 44px;
+    }
+}

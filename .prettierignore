@@ -3,3 +3,6 @@
 /.idea/
 /package-lock.json
 **/*.md
+/.playwright-cli/
+/test-results/
+/playwright-report/
