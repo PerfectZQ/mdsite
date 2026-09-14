@@ -29,7 +29,7 @@ npm run format        # 格式化源码、脚本、测试和配置
 npm run format:check  # 只检查，不修改文件
 ```
 
-GoLand 安装 JetBrains 的 Prettier 插件后，在 `Settings → Languages & Frameworks → JavaScript → Prettier` 使用 `Automatic Prettier configuration`，启用 `Run on 'Reformat Code' action` 和 `Run on save`，使 IDE 使用项目中的 Prettier 和同一份配置。不要另外使用全局安装的 Prettier。
+GoLand 需要安装 JetBrains 的 Prettier 插件，首次安装后重启 IDE。项目的 `.idea/prettier.xml` 已启用自动查找项目 Prettier、`Run on 'Reformat Code' action` 和 `Run on save`，使 IDE 使用相同版本和配置。可在 `Settings → Languages & Frameworks → JavaScript → Prettier` 查看这些设置，不需要全局安装 Prettier。
 
 `prebuild` 自动执行 `npm run format`，本地构建、测试前的构建和 GitHub Release 中的 `npm pack` 都经过这一入口。格式化失败会中止构建。Markdown 文档与示例、锁文件、IDE 配置、依赖和构建产物不参与批量格式化。
 
@@ -113,12 +113,12 @@ mdsite build . -o dist/docs.html
 mdsite serve .
 ```
 
-Latest 地址始终指向最新正式版；需要可复现构建时，将 `latest/download` 换成 `download/v0.2.2` 等固定版本路径。
+Latest 地址始终指向最新正式版；需要可复现构建时，将 `latest/download` 换成 `download/v0.2.4` 等固定版本路径。
 
 也可以从公网 URL 执行完整的安装包验证，脚本会核对发行包版本与当前源码版本一致：
 
 ```sh
-node scripts/verify-package.ts https://github.com/PerfectZQ/mdsite/releases/download/v0.2.2/mdsite.tgz
+node scripts/verify-package.ts https://github.com/PerfectZQ/mdsite/releases/download/v0.2.4/mdsite.tgz
 ```
 
 `verify-package.ts` 在临时目录中用独立 npm 缓存安装线上发行包，禁用安装脚本，只安装运行依赖，再验证 `version`、`build`（含自定义输出路径、变更检测和失败时保留产物）、`serve`、随包文档和内联 Mermaid；结束后自动清理。脚本支持 macOS / Linux，GitHub Actions 在 Linux 上使用同一脚本验证待发布的包。

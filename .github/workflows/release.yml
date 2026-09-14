@@ -63,6 +63,21 @@ jobs:
           \`\`\`sh
           npm install -g https://github.com/${GH_REPO}/releases/download/${RELEASE_TAG}/mdsite.tgz
           mdsite version
+          \`\`\`
+
+          ## 本地预览
+
+          在包含 Markdown 的项目目录运行，用浏览器打开终端显示的地址，修改文档后刷新页面：
+
+          \`\`\`sh
+          mdsite serve .
+          \`\`\`
+
+          ## 构建静态资源
+
+          生成独立 HTML，供离线分发或已有网站、业务服务托管：
+
+          \`\`\`sh
           mdsite build . -o public/docs/index.html
           \`\`\`
 

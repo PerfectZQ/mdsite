@@ -2,7 +2,14 @@
 
 [返回项目介绍](../README.md)
 
-mdsite 将项目中的 Markdown 生成为可浏览、检索的文档 UI。使用前准备 Node.js 24+；生成的 HTML 可以离线打开，托管时无需 Node 服务。
+mdsite 将项目中的 Markdown 生成为可浏览、检索的文档 UI。安装后，在包含 Markdown 的业务项目目录中使用；无需初始化文档工程或登记页面。
+
+| 你要做什么 | 使用命令 | 得到什么 |
+| --- | --- | --- |
+| 边写文档边在浏览器查看 | `mdsite serve .` | 本地预览地址，刷新时读取最新文档 |
+| 生成可分发、部署或嵌入服务的静态资源 | `mdsite build . -o public/docs/index.html` | 一个包含完整文档 UI 的 HTML 文件 |
+
+运行 mdsite 需要 Node.js 24+。构建完成的 HTML 可离线打开或交给静态服务器托管，访问者不需要安装 Node.js 或 mdsite。
 
 ## 安装和更新
 
@@ -15,21 +22,61 @@ mdsite version
 
 更新时再次执行同一条安装命令即可。无需 GitHub 或 npm 账号，无需手动下载文件，也无需获取源码或自行编译。
 
-需要固定版本时，将安装 URL 中的 `latest/download` 替换为 `download/v0.2.2` 等版本路径。[版本列表](https://github.com/PerfectZQ/mdsite/releases)提供各版本的安装包和 SHA-256 校验文件。
+需要固定版本时，将安装 URL 中的 `latest/download` 替换为 `download/v0.2.4` 等版本路径。[版本列表](https://github.com/PerfectZQ/mdsite/releases)提供各版本的安装包和 SHA-256 校验文件。
 
-## 生成文档
+若安装成功后 `mdsite version` 仍提示“未知命令”，请先看文末的[旧命令冲突排查](#旧命令冲突排查)。
 
-在业务项目根目录执行：
+## 方式一：本地预览
+
+适合写文档、检查渲染效果和本地浏览项目资料。在业务项目根目录执行：
+
+```sh
+mdsite serve .
+```
+
+终端会打印预览地址，默认是 **http://127.0.0.1:6060**。用浏览器打开该地址，并保持终端中的命令运行；结束预览时按 `Ctrl+C`。
+
+- `.` 表示扫描当前项目，包含子目录中的 Markdown，并读取项目根目录的 `.mdignore`。
+- 新增、修改、移动或删除 Markdown，以及修改本地图片或 `.mdignore` 后，手动刷新浏览器即可看到最新结果。
+- `serve` 不写出静态 HTML；关闭预览进程后，本地地址停止服务。
+
+只预览某个目录，或更换标题、端口：
+
+```sh
+mdsite serve ./doc --title "项目文档" --addr 127.0.0.1:6061
+```
+
+此时只扫描 `./doc`，读取其中的 `.mdignore`，浏览器访问 http://127.0.0.1:6061。
+
+## 方式二：构建静态资源
+
+适合发布文档、分发离线文件，或将文档 UI 嵌入已有网站和业务服务。在业务项目根目录执行：
 
 ```sh
 mdsite build . -o public/docs/index.html
 ```
 
-mdsite 自动扫描当前项目，读取根目录的 `.mdignore`，将 Markdown、搜索数据、阅读器 UI 和本地图片生成到指定文件。用 `-o`（或 `--output`）指定项目实际使用的 HTML 路径，目录不存在时自动创建；省略时默认生成 `dist/index.html`。
+命令生成文件后退出，产物是：
 
-生成的 HTML 可以直接打开，也可以放到已有网站、Nginx 或业务服务的静态资源目录。页面使用 hash 路由，支持 `/docs/` 等任意挂载路径；使用方负责静态资源挂载和访问控制。
+```text
+public/
+└── docs/
+    └── index.html
+```
 
-## 接入现有构建流程
+这个 HTML 内含阅读器 UI、文档内容、搜索数据、JavaScript、CSS 和本地图片；有 Mermaid 图表时也会内联渲染器。分发这一个文件即可，文档中引用的外部图片仍需要网络。
+
+`-o`（或 `--output`）指定输出文件，路径相对执行命令时的工作目录；父目录不存在时自动创建。省略 `-o` 时默认输出 `dist/index.html`。也可以只构建某个文档目录：
+
+```sh
+mdsite build ./doc --output public/docs/index.html --title "项目文档"
+```
+
+生成后，可以直接用浏览器打开 HTML，发送给其他人，或将它放到已有网站、Nginx、业务服务的静态资源目录。若服务将 `public/docs/` 挂载到 `/docs/`，访问对应的 `/docs/` 地址即可；页面使用 hash 路由，支持任意挂载路径，使用方负责静态资源挂载和访问控制。
+
+之后修改 Markdown，需要再次执行 `mdsite build` 更新 HTML。`build` 不启动预览服务，也不持续监听文件变化。
+
+### 接入业务项目的构建流程
 
 把同一条 `mdsite build` 命令放到项目现有构建脚本中、服务编译或资源打包之前。以 Go 项目为例：
 
@@ -58,14 +105,6 @@ go build -o output/service ./cmd/service
 - 生成失败：命令以非零状态退出，保留上一份 HTML；上面的 `set -e` 会阻止后续服务构建。
 
 比较覆盖最终页面，不依赖 Git 提交记录或时间戳缓存。被忽略的内容不会进入资源；输出 HTML 也不会被当作 Markdown 再次扫描。服务构建在文档检查成功后照常运行。
-
-## 本地预览
-
-```sh
-mdsite serve .                            # http://127.0.0.1:6060
-```
-
-无需初始化或登记文档。修改 Markdown 后刷新页面，即可查看最新 UI；正式集成使用上面的 `build` 流程。
 
 ## 命令
 
@@ -128,3 +167,17 @@ docs/**/internal-*.md
 默认忽略 `.git`、`.hg`、`.svn`、`.codegraph`、`node_modules`、`vendor`、`dist`、`output`、`.next`、`.venv`、`venv`、`__pycache__`。默认规则可由 `.mdignore` 覆盖，例如 `!dist/`。`--exclude private,.cache` 优先级最高，按根目录相对路径排除，不解析通配符，不受 `!` 覆盖。
 
 `.mdignore` 必须是普通文件；读取失败会终止构建。被忽略的内容不会进入页面或搜索，也不能通过符号链接或内联图片绕过。
+
+## 旧命令冲突排查
+
+如果 npm 安装成功，但 `mdsite version` 提示“未知命令”，或 `--help` 仍显示旧参数格式，终端可能优先运行了以前安装的同名程序。macOS / Linux 下执行：
+
+```sh
+type -a mdsite
+npm list -g mdsite --depth=0
+"$(npm prefix -g)/bin/mdsite" version
+```
+
+`type -a` 按查找顺序列出入口；第三条命令直接运行当前 npm 的全局安装版本。例如，旧 Go 版可能位于 `~/.local/bin/mdsite`，排在 npm 的 `/opt/homebrew/bin/mdsite` 前面，重新安装 npm 包不会覆盖前者。
+
+如果直接运行 npm 入口可以正确显示版本，移走已确认的旧同名程序，再打开新终端；zsh 也可执行 `rehash` 刷新命令缓存。然后重新运行 `mdsite version`，确认终端使用的是已安装的新版本。
