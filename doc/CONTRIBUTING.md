@@ -18,7 +18,20 @@ node dist/cli.js serve examples/content
 node dist/cli.js build examples/content -o dist/example.html
 ```
 
-`npm run build` 编译 TypeScript CLI，并打包 React 阅读器资源。修改源码后重新执行构建；修改 CLI 或服务代码后需要重启预览进程。仅修改 Markdown 或 `.mdignore` 时，刷新页面即可读取最新内容。
+`npm run build` 先自动格式化，再编译 TypeScript CLI 并打包 React 阅读器资源。修改源码后重新执行构建；修改 CLI 或服务代码后需要重启预览进程。仅修改 Markdown 或 `.mdignore` 时，刷新页面即可读取最新内容。
+
+## 代码格式
+
+项目使用固定版本的 Prettier；`.editorconfig` 定义缩进、行宽和换行符，`.prettierrc.json` 定义代码格式。TypeScript、JavaScript 和 CSS 使用 4 空格缩进，JSON 和 YAML 使用 2 空格；代码使用单引号、不加行尾分号，花括号内不留空格，行宽为 120。
+
+```sh
+npm run format        # 格式化源码、脚本、测试和配置
+npm run format:check  # 只检查，不修改文件
+```
+
+GoLand 安装 JetBrains 的 Prettier 插件后，在 `Settings → Languages & Frameworks → JavaScript → Prettier` 使用 `Automatic Prettier configuration`，启用 `Run on 'Reformat Code' action` 和 `Run on save`，使 IDE 使用项目中的 Prettier 和同一份配置。不要另外使用全局安装的 Prettier。
+
+`prebuild` 自动执行 `npm run format`，本地构建、测试前的构建和 GitHub Release 中的 `npm pack` 都经过这一入口。格式化失败会中止构建。Markdown 文档与示例、锁文件、IDE 配置、依赖和构建产物不参与批量格式化。
 
 ## 检查与测试
 
@@ -46,7 +59,6 @@ scripts/verify-package.ts # 在独立目录验证安装包
 .github/workflows/release.yml # GitHub Release 自动发版
 tests/                 # 功能回归测试
 examples/content/      # Markdown 示例
-examples/build-with-docs.sh # 使用方构建脚本：先更新 UI 资源，再执行服务构建
 ```
 
 工程只有一个 `package.json` 和锁文件。`src/content/` 负责读取和渲染 Markdown，`src/reader/` 负责浏览器交互，`src/site.ts` 组合为完整静态 HTML，`src/preview.ts` 提供本地预览。Go 等语言只在使用方集成生成产物时涉及。
@@ -59,12 +71,12 @@ examples/build-with-docs.sh # 使用方构建脚本：先更新 UI 资源，再�
 
 本地只做开发、检查和源码提交，不生成 `.tgz`。推送版本标签后，由 GitHub Actions 在线构建、验证并发布发行包。
 
-发行内容由 `package.json` 的 `files` 字段限定，包括编译后的 JavaScript、阅读器资源、第三方许可证、用户/开发文档和使用方构建脚本。不携带源码、测试、开发依赖或平台二进制，`dist/` 和发行包不提交到源码仓库。
+发行内容由 `package.json` 的 `files` 字段限定，包括编译后的 JavaScript、阅读器资源、第三方许可证和用户/开发文档。不携带源码、测试、开发依赖或平台二进制，`dist/` 和发行包不提交到源码仓库。
 
 [Release 工作流](https://github.com/PerfectZQ/mdsite/blob/main/.github/workflows/release.yml)在推送 `v*` 标签时自动执行：
 
 1. 核对标签、`package.json` 和 `package-lock.json` 中的版本一致；当前只接受 `v主版本.次版本.修订版本` 格式的正式版本。
-2. 使用 Node.js 24 执行 `npm ci` 和 `npm pack`，完成类型检查、构建和测试。
+2. 使用 Node.js 24 执行 `npm ci` 和 `npm pack`，完成类型检查、自动格式化、构建和测试。
 3. 在独立目录安装并验证生成的发行包。
 4. 将发行包统一命名为 `mdsite.tgz`，生成 `mdsite.tgz.sha256`。
 5. 创建带完整附件的 Release 草稿，再发布并标记为 Latest。
@@ -86,7 +98,7 @@ git tag -a "v$version" -m "Release v$version"
 git push --atomic origin main "v$version"
 ```
 
-GitHub Actions 中的 `npm pack` 通过 `prepack` 执行类型检查、构建和测试，再生成发行包并发布到 Releases。工作流运行情况见 [Actions](https://github.com/PerfectZQ/mdsite/actions/workflows/release.yml)，完成后在 [Releases](https://github.com/PerfectZQ/mdsite/releases) 查看安装包。
+GitHub Actions 中的 `npm pack` 通过 `prepack` 执行类型检查、自动格式化、构建和测试，再生成发行包并发布到 Releases。工作流运行情况见 [Actions](https://github.com/PerfectZQ/mdsite/actions/workflows/release.yml)，完成后在 [Releases](https://github.com/PerfectZQ/mdsite/releases) 查看安装包。
 
 失败时先查看对应步骤的日志。修正源码后使用新版本发版；如果只是网络等临时故障，可在 Actions 页面重新运行原任务。也支持手动运行工作流，但必须选择版本标签作为 ref，不能选择 `main`。如果失败留下了草稿 Release，先删除该草稿再重跑；已发布的版本不覆盖、不移动标签。
 
@@ -109,6 +121,6 @@ Latest 地址始终指向最新正式版；需要可复现构建时，将 `lates
 node scripts/verify-package.ts https://github.com/PerfectZQ/mdsite/releases/download/v0.2.2/mdsite.tgz
 ```
 
-`verify-package.ts` 在临时目录中用独立 npm 缓存安装线上发行包，禁用安装脚本，只安装运行依赖，再验证 `version`、`build`、`serve`、随包文档、构建脚本和内联 Mermaid；结束后自动清理。脚本支持 macOS / Linux，GitHub Actions 在 Linux 上使用同一脚本验证待发布的包。
+`verify-package.ts` 在临时目录中用独立 npm 缓存安装线上发行包，禁用安装脚本，只安装运行依赖，再验证 `version`、`build`（含自定义输出路径、变更检测和失败时保留产物）、`serve`、随包文档和内联 Mermaid；结束后自动清理。脚本支持 macOS / Linux，GitHub Actions 在 Linux 上使用同一脚本验证待发布的包。
 
 每个 Release 附带 `mdsite.tgz.sha256`。需要独立检查时，将安装包和校验文件下载到同一目录，再执行 `sha256sum -c mdsite.tgz.sha256`（Linux）或 `shasum -a 256 -c mdsite.tgz.sha256`（macOS）。

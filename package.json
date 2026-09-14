@@ -15,7 +15,6 @@
   "files": [
     "doc/QUICK_START.md",
     "doc/CONTRIBUTING.md",
-    "examples/build-with-docs.sh",
     "dist/**/*.js",
     "dist/assets/*.css",
     "dist/assets/*.txt"
@@ -24,7 +23,10 @@
     "node": ">=24"
   },
   "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "check": "tsc --noEmit",
+    "prebuild": "npm run format",
     "build": "tsc -p tsconfig.build.json && node scripts/build.ts",
     "pretest": "npm run build",
     "test": "node --test tests/*.test.mjs",
@@ -47,6 +49,7 @@
     "esbuild": "0.28.2",
     "highlight.js": "11.12.0",
     "mermaid": "11.17.2",
+    "prettier": "3.9.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "typescript": "7.0.2"

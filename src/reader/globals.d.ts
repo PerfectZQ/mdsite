@@ -1,3 +1,3 @@
 interface Window {
-  mdsiteMermaid?: typeof import('mermaid')['default']
+    mdsiteMermaid?: (typeof import('mermaid'))['default']
 }

@@ -15,21 +15,9 @@ mdsite version
 
 更新时再次执行同一条安装命令即可。无需 GitHub 或 npm 账号，无需手动下载文件，也无需获取源码或自行编译。
 
-需要固定版本时，在 URL 中指定版本标签，例如：
+需要固定版本时，将安装 URL 中的 `latest/download` 替换为 `download/v0.2.2` 等版本路径。[版本列表](https://github.com/PerfectZQ/mdsite/releases)提供各版本的安装包和 SHA-256 校验文件。
 
-```sh
-npm install -g https://github.com/PerfectZQ/mdsite/releases/download/v0.2.2/mdsite.tgz
-```
-
-也可以只运行一次，不全局安装：
-
-```sh
-npx --yes --package=https://github.com/PerfectZQ/mdsite/releases/latest/download/mdsite.tgz mdsite build . -o public/docs/index.html
-```
-
-[版本列表](https://github.com/PerfectZQ/mdsite/releases)提供各版本的安装包和 SHA-256 校验文件。npm 在这里作为安装工具，mdsite 的发行包由 GitHub 托管。
-
-## 推荐：生成 UI 资源，随业务服务一起构建
+## 生成文档
 
 在业务项目根目录执行：
 
@@ -37,9 +25,13 @@ npx --yes --package=https://github.com/PerfectZQ/mdsite/releases/latest/download
 mdsite build . -o public/docs/index.html
 ```
 
-mdsite 自动扫描当前项目，读取根目录的 `.mdignore`，将 Markdown、搜索数据、阅读器 UI 和本地图片生成到指定文件。`public/docs` 可替换为项目实际使用的资源目录；`-o` 要写到 HTML 文件名。
+mdsite 自动扫描当前项目，读取根目录的 `.mdignore`，将 Markdown、搜索数据、阅读器 UI 和本地图片生成到指定文件。用 `-o`（或 `--output`）指定项目实际使用的 HTML 路径，目录不存在时自动创建；省略时默认生成 `dist/index.html`。
 
-将该文件接入服务的静态资源路由，例如 `/docs/`。之后把同一条命令放到现有构建脚本中、服务编译或资源打包之前：
+生成的 HTML 可以直接打开，也可以放到已有网站、Nginx 或业务服务的静态资源目录。页面使用 hash 路由，支持 `/docs/` 等任意挂载路径；使用方负责静态资源挂载和访问控制。
+
+## 接入现有构建流程
+
+把同一条 `mdsite build` 命令放到项目现有构建脚本中、服务编译或资源打包之前。以 Go 项目为例：
 
 ```sh
 #!/bin/sh
@@ -48,11 +40,13 @@ set -eu
 # 在业务项目根目录运行，先同步文档资源
 mdsite build . -o public/docs/index.html
 
-# 接着执行项目原有的服务构建命令；这里以 Go 项目为例
+# 项目原有的服务构建命令
 go build -o output/service ./cmd/service
 ```
 
-每次发布运行业务构建脚本即可，生成资源会进入本次服务产物。Node.js 24+ 和 mdsite 只需装在开发机或 CI 构建环境，服务运行时直接托管 HTML。
+每次发布运行业务构建脚本即可。将输出路径设为项目实际打包或嵌入的资源位置，生成的 HTML 就会进入本次服务产物。Node.js 24+ 和 mdsite 只需装在开发机或 CI 构建环境，服务运行时直接托管 HTML。
+
+可将生成的 HTML 加入 `.gitignore`，每次构建重新生成；是否忽略源文档由 `.mdignore` 控制。
 
 ### 自动检测变更
 
@@ -64,48 +58,6 @@ go build -o output/service ./cmd/service
 - 生成失败：命令以非零状态退出，保留上一份 HTML；上面的 `set -e` 会阻止后续服务构建。
 
 比较覆盖最终页面，不依赖 Git 提交记录或时间戳缓存。被忽略的内容不会进入资源；输出 HTML 也不会被当作 Markdown 再次扫描。服务构建在文档检查成功后照常运行。
-
-### 直接使用随包脚本
-
-如果希望直接复用脚本，公网安装后在业务项目根目录执行一次：
-
-```sh
-mkdir -p scripts
-cp "$(npm root -g)/mdsite/examples/build-with-docs.sh" scripts/build-with-docs.sh
-```
-
-之后将项目原有构建命令作为参数传入：
-
-```sh
-# 先更新 public/docs/index.html，再构建 Go 服务
-sh scripts/build-with-docs.sh go build -o output/service ./cmd/service
-
-# 自定义资源目录，再执行项目原有的 npm 构建
-MDSITE_OUTPUT=static/help/index.html sh scripts/build-with-docs.sh npm run build
-```
-
-从业务项目根目录运行，脚本会扫描当前项目；`MDSITE_OUTPUT` 相对当前工作目录解析，也可以使用绝对路径。脚本随安装包分发，[源码在这里](../examples/build-with-docs.sh)。业务服务仍由你传入的原构建命令负责。
-
-### 已有 npm 构建流程
-
-也可以把 mdsite 作为项目开发依赖，从公网安装并记录在锁文件中：
-
-```sh
-npm install --save-dev https://github.com/PerfectZQ/mdsite/releases/download/v0.2.2/mdsite.tgz
-```
-
-在业务项目 `package.json` 中添加：
-
-```json
-{
-  "scripts": {
-    "docs:build": "mdsite build . -o public/docs/index.html",
-    "prebuild": "npm run docs:build"
-  }
-}
-```
-
-保留项目已有的 `build` 命令。执行 `npm run build` 时，npm 会先运行 `prebuild`，再执行服务构建。如果已有 `prebuild`，将文档命令合入原流程；CI 中在生成文档前安装开发依赖。可将生成的 HTML 加入 `.gitignore`，每次构建重新生成；是否忽略源文档由 `.mdignore` 单独控制。
 
 ## 本地预览
 
@@ -127,40 +79,6 @@ mdsite --help
 目录默认是当前目录，标题默认是目录名。选项可放在目录之前或之后；`--exclude` 用逗号分隔多个根目录相对路径。`-o` 也可写作 `--output`，输出路径相对执行命令时的工作目录，必须使用 `.html` 或 `.htm` 扩展名。
 
 `serve` 每次刷新都会重新扫描 Markdown 和 `.mdignore`，新增、修改、移动、删除文件都会生效。只提供生成页面，不暴露源码文件。`build` 生成完整页面并比较后，仅在内容变化时替换输出；生成失败时保留上一份产物。
-
-## 集成生成的 UI
-
-```sh
-mdsite build . -o public/docs/index.html
-```
-
-将生成的 HTML 放到已有网站、Nginx 或服务的静态资源目录即可。页面使用 hash 路由，支持 `/docs/` 等任意挂载路径，无需接口、数据库或 Node 服务。使用上面的业务构建脚本，每次发布时自动更新资源。
-
-Go 的 `embed` 是使用方的一种集成方式，只依赖 Go 标准库：
-
-```go
-package main
-
-import (
-    "embed"
-    "io/fs"
-    "log"
-    "net/http"
-)
-
-//go:embed public/docs/index.html
-var assets embed.FS
-
-func main() {
-    docs, err := fs.Sub(assets, "public/docs")
-    if err != nil { log.Fatal(err) }
-    mux := http.NewServeMux()
-    mux.Handle("/docs/", http.StripPrefix("/docs", http.FileServerFS(docs)))
-    log.Fatal(http.ListenAndServe("127.0.0.1:8080", mux))
-}
-```
-
-mdsite 不提供 Go 包或运行时绑定；使用方负责静态资源挂载和访问控制。其他语言同样可以直接使用生成的 HTML。
 
 ## 目录和内容
 
