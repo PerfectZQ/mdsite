@@ -1,6 +1,6 @@
 # QUICK START
 
-[返回项目介绍](README.md)
+[返回项目介绍](../README.md)
 
 mdsite 将项目中的 Markdown 生成为可浏览、检索的文档 UI。使用前准备 Node.js 24+；生成的 HTML 可以离线打开，托管时无需 Node 服务。
 
@@ -18,7 +18,7 @@ mdsite version
 需要固定版本时，在 URL 中指定版本标签，例如：
 
 ```sh
-npm install -g https://github.com/PerfectZQ/mdsite/releases/download/v0.2.1/mdsite.tgz
+npm install -g https://github.com/PerfectZQ/mdsite/releases/download/v0.2.2/mdsite.tgz
 ```
 
 也可以只运行一次，不全局安装：
@@ -84,14 +84,14 @@ sh scripts/build-with-docs.sh go build -o output/service ./cmd/service
 MDSITE_OUTPUT=static/help/index.html sh scripts/build-with-docs.sh npm run build
 ```
 
-从业务项目根目录运行，脚本会扫描当前项目；`MDSITE_OUTPUT` 相对当前工作目录解析，也可以使用绝对路径。脚本随安装包分发，[源码在这里](examples/build-with-docs.sh)。业务服务仍由你传入的原构建命令负责。
+从业务项目根目录运行，脚本会扫描当前项目；`MDSITE_OUTPUT` 相对当前工作目录解析，也可以使用绝对路径。脚本随安装包分发，[源码在这里](../examples/build-with-docs.sh)。业务服务仍由你传入的原构建命令负责。
 
 ### 已有 npm 构建流程
 
 也可以把 mdsite 作为项目开发依赖，从公网安装并记录在锁文件中：
 
 ```sh
-npm install --save-dev https://github.com/PerfectZQ/mdsite/releases/download/v0.2.1/mdsite.tgz
+npm install --save-dev https://github.com/PerfectZQ/mdsite/releases/download/v0.2.2/mdsite.tgz
 ```
 
 在业务项目 `package.json` 中添加：

@@ -1,6 +1,6 @@
 # 开发指南
 
-本文面向修改、测试和发布 mdsite 的开发者。安装、使用和业务项目集成见[QUICK START](QUICK_START.md)，项目介绍见 [README](README.md)。
+本文面向修改、测试和发布 mdsite 的开发者。安装、使用和业务项目集成见[QUICK START](QUICK_START.md)，项目介绍见 [README](../README.md)。
 
 ## 环境与本地开发
 
@@ -51,23 +51,15 @@ examples/build-with-docs.sh # 使用方构建脚本：先更新 UI 资源，再�
 
 工程只有一个 `package.json` 和锁文件。`src/content/` 负责读取和渲染 Markdown，`src/reader/` 负责浏览器交互，`src/site.ts` 组合为完整静态 HTML，`src/preview.ts` 提供本地预览。Go 等语言只在使用方集成生成产物时涉及。
 
-根目录的文档按读者组织：`README.md` 是项目介绍和入口，`QUICK_START.md` 面向正式用户，`CONTRIBUTING.md` 承接开发、测试和发包说明。
-
-## 构建和打包
-
-```sh
-npm ci
-npm pack
-node scripts/verify-package.ts ./mdsite-0.2.1.tgz
-```
-
-`npm pack` 的 `prepack` 会执行类型检查、构建和测试，当前版本输出 `mdsite-0.2.1.tgz`。`verify-package.ts` 在临时目录中用独立 npm 缓存安装包，禁用安装脚本，只安装运行依赖，再验证 `version`、`build`、`serve`、随包文档、构建脚本和内联 Mermaid；结束后自动清理。这个验证脚本用于 macOS / Linux，GitHub 发版在 Linux 上执行。
-
-发行内容由 `package.json` 的 `files` 字段限定，包括编译后的 JavaScript、阅读器资源、第三方许可证、用户/开发文档和使用方构建脚本。不携带源码、测试、开发依赖或平台二进制。`dist/` 和本地 `.tgz` 不提交到源码仓库。
+根目录保留 `README.md` 作为项目介绍和入口，其余文档放在 `doc/`：`doc/QUICK_START.md` 面向正式用户，`doc/CONTRIBUTING.md` 承接开发、测试和发包说明。
 
 ## GitHub 公网分发
 
 项目使用公开仓库 [PerfectZQ/mdsite](https://github.com/PerfectZQ/mdsite) 的 Releases 分发，不执行 `npm publish`，不需要 npm 发布账号或 npm Token。
+
+本地只做开发、检查和源码提交，不生成 `.tgz`。推送版本标签后，由 GitHub Actions 在线构建、验证并发布发行包。
+
+发行内容由 `package.json` 的 `files` 字段限定，包括编译后的 JavaScript、阅读器资源、第三方许可证、用户/开发文档和使用方构建脚本。不携带源码、测试、开发依赖或平台二进制，`dist/` 和发行包不提交到源码仓库。
 
 [Release 工作流](https://github.com/PerfectZQ/mdsite/blob/main/.github/workflows/release.yml)在推送 `v*` 标签时自动执行：
 
@@ -81,29 +73,20 @@ node scripts/verify-package.ts ./mdsite-0.2.1.tgz
 
 ### 发布一个版本
 
-先提交并推送该版本的源码和文档，再创建同版本标签：
-
-```sh
-# 以 0.2.1 为例；标签已存在时不要重复创建
-git push origin main
-git tag -a v0.2.1 -m "Release v0.2.1"
-git push origin v0.2.1
-```
-
-后续发版先更新版本号和锁文件，例如修订版本：
+更新版本号和锁文件，检查后提交全部改动，再将源码和对应标签一起推送。以下以修订版本为例；若本次版本号已更新，跳过第一条命令：
 
 ```sh
 npm version patch --no-git-tag-version
-# 确认变更后提交源码、文档、package.json 和 package-lock.json
-git add package.json package-lock.json
-git commit -m "chore: bump release version"
-git push origin main
+npm run check
+npm test
 version=$(node -p "require('./package.json').version")
+git add -A
+git commit -m "chore: release v$version"
 git tag -a "v$version" -m "Release v$version"
-git push origin "v$version"
+git push --atomic origin main "v$version"
 ```
 
-`npm pack` 会在远程发版时重新检查和构建，因此无需提交本地编译产物。工作流运行情况见 [Actions](https://github.com/PerfectZQ/mdsite/actions/workflows/release.yml)，完成后在 [Releases](https://github.com/PerfectZQ/mdsite/releases) 查看安装包。
+GitHub Actions 中的 `npm pack` 通过 `prepack` 执行类型检查、构建和测试，再生成发行包并发布到 Releases。工作流运行情况见 [Actions](https://github.com/PerfectZQ/mdsite/actions/workflows/release.yml)，完成后在 [Releases](https://github.com/PerfectZQ/mdsite/releases) 查看安装包。
 
 失败时先查看对应步骤的日志。修正源码后使用新版本发版；如果只是网络等临时故障，可在 Actions 页面重新运行原任务。也支持手动运行工作流，但必须选择版本标签作为 ref，不能选择 `main`。如果失败留下了草稿 Release，先删除该草稿再重跑；已发布的版本不覆盖、不移动标签。
 
@@ -118,12 +101,14 @@ mdsite build . -o dist/docs.html
 mdsite serve .
 ```
 
-Latest 地址始终指向最新正式版；需要可复现构建时，将 `latest/download` 换成 `download/v0.2.1` 等固定版本路径。
+Latest 地址始终指向最新正式版；需要可复现构建时，将 `latest/download` 换成 `download/v0.2.2` 等固定版本路径。
 
 也可以从公网 URL 执行完整的安装包验证，脚本会核对发行包版本与当前源码版本一致：
 
 ```sh
-node scripts/verify-package.ts https://github.com/PerfectZQ/mdsite/releases/download/v0.2.1/mdsite.tgz
+node scripts/verify-package.ts https://github.com/PerfectZQ/mdsite/releases/download/v0.2.2/mdsite.tgz
 ```
+
+`verify-package.ts` 在临时目录中用独立 npm 缓存安装线上发行包，禁用安装脚本，只安装运行依赖，再验证 `version`、`build`、`serve`、随包文档、构建脚本和内联 Mermaid；结束后自动清理。脚本支持 macOS / Linux，GitHub Actions 在 Linux 上使用同一脚本验证待发布的包。
 
 每个 Release 附带 `mdsite.tgz.sha256`。需要独立检查时，将安装包和校验文件下载到同一目录，再执行 `sha256sum -c mdsite.tgz.sha256`（Linux）或 `shasum -a 256 -c mdsite.tgz.sha256`（macOS）。

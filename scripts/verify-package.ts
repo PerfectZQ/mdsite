@@ -25,7 +25,7 @@ try {
   const cli = join(installed, pkg.bin.mdsite)
   const run = (args: string[]) => execFileSync(process.execPath, [cli, ...args], { cwd: sandbox, encoding: 'utf8' })
   assert.equal(run(['version']).trim(), `mdsite ${expected.version}`)
-  for (const file of ['README.md', 'QUICK_START.md', 'CONTRIBUTING.md']) await readFile(join(installed, file))
+  for (const file of ['README.md', 'doc/QUICK_START.md', 'doc/CONTRIBUTING.md']) await readFile(join(installed, file))
 
   await mkdir(join(sandbox, 'content'))
   await writeFile(join(sandbox, 'content/README.md'), '# Package check\n\n独立安装验证\n\n```mermaid\ngraph LR\nA-->B\n```\n')

@@ -21,6 +21,7 @@ export function DocumentationSite({ catalog }: { catalog: Catalog }) {
     () => catalog.documents.find((document) => document.path === documentPath),
     [catalog, documentPath],
   )
+  const headings = current?.headings.filter((heading) => heading.level <= 3) ?? []
 
   useEffect(() => {
     const change = () => {
@@ -46,6 +47,18 @@ export function DocumentationSite({ catalog }: { catalog: Catalog }) {
       window.removeEventListener('hashchange', change)
       window.removeEventListener('keydown', keyboard)
     }
+  }, [])
+
+  useEffect(() => {
+    const viewport = window.matchMedia('(max-width: 960px)')
+    const change = () => {
+      if (!viewport.matches && mobileNavigation.current?.open) {
+        mobileNavigation.current.close()
+        content.current?.focus({ preventScroll: true })
+      }
+    }
+    viewport.addEventListener('change', change)
+    return () => viewport.removeEventListener('change', change)
   }, [])
 
   useEffect(() => {
@@ -82,7 +95,7 @@ export function DocumentationSite({ catalog }: { catalog: Catalog }) {
       catalog.documents.some((document) => document.path.startsWith(path))
     ) {
       setRevealedDirectory(path.replace(/\/$/, ''))
-      if (window.matchMedia('(max-width: 760px)').matches)
+      if (window.matchMedia('(max-width: 960px)').matches)
         mobileNavigation.current?.showModal()
       return
     }
@@ -111,6 +124,7 @@ export function DocumentationSite({ catalog }: { catalog: Catalog }) {
         </a>
         <button
           className="search-trigger"
+          aria-label="搜索文档"
           onClick={() => search.current?.showModal()}
         >
           <span aria-hidden="true">⌕</span>
@@ -162,14 +176,17 @@ export function DocumentationSite({ catalog }: { catalog: Catalog }) {
                   约 {Math.max(1, Math.ceil(current.words / 650))} 分钟
                 </span>
               </div>
-              <details className="mobile-toc">
-                <summary>本页目录</summary>
-                <nav aria-label="移动端章节目录">
-                  {current.headings
-                    .filter((heading) => heading.level <= 3)
-                    .map((heading) => (
+              {headings.length > 0 && (
+                <details className="mobile-toc">
+                  <summary>本页目录</summary>
+                  <nav aria-label="本页章节目录">
+                    {headings.map((heading) => (
                       <a
+                        className={`toc-level-${heading.level}`}
                         key={heading.id}
+                        aria-current={
+                          activeHeading === heading.id ? 'location' : undefined
+                        }
                         href={documentHref(current.path, heading.id)}
                         onClick={(event) => {
                           event.currentTarget
@@ -183,8 +200,9 @@ export function DocumentationSite({ catalog }: { catalog: Catalog }) {
                         {heading.title}
                       </a>
                     ))}
-                </nav>
-              </details>
+                  </nav>
+                </details>
+              )}
               <MarkdownDocument
                 key={current.path}
                 document={current}
@@ -202,29 +220,27 @@ export function DocumentationSite({ catalog }: { catalog: Catalog }) {
             </section>
           )}
         </main>
-        {current && (
+        {current && headings.length > 0 && (
           <aside className="page-toc">
             <strong>本页目录</strong>
             <nav aria-label="章节目录">
-              {current.headings
-                .filter((heading) => heading.level <= 3)
-                .map((heading) => (
-                  <a
-                    className={`toc-level-${heading.level}`}
-                    key={heading.id}
-                    aria-current={
-                      activeHeading === heading.id ? 'location' : undefined
-                    }
-                    href={documentHref(current.path, heading.id)}
-                    onClick={() =>
-                      document
-                        .getElementById(heading.id)
-                        ?.scrollIntoView({ block: 'start' })
-                    }
-                  >
-                    {heading.title}
-                  </a>
-                ))}
+              {headings.map((heading) => (
+                <a
+                  className={`toc-level-${heading.level}`}
+                  key={heading.id}
+                  aria-current={
+                    activeHeading === heading.id ? 'location' : undefined
+                  }
+                  href={documentHref(current.path, heading.id)}
+                  onClick={() =>
+                    document
+                      .getElementById(heading.id)
+                      ?.scrollIntoView({ block: 'start' })
+                  }
+                >
+                  {heading.title}
+                </a>
+              ))}
             </nav>
           </aside>
         )}

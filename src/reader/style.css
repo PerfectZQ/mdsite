@@ -8,6 +8,10 @@
   --line: #dce4ef;
   --blue: #2f63d4;
   --blue-soft: #eaf0fe;
+  --topbar-height: 66px;
+  --sidebar-width: clamp(244px, 16vw, 300px);
+  --content-width: 1040px;
+  --page-gutter: clamp(24px, 3vw, 64px);
   --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font:
     14px/1.6 Inter,
@@ -92,7 +96,7 @@ kbd {
   position: sticky;
   top: 0;
   z-index: 10;
-  height: 66px;
+  height: var(--topbar-height);
   padding: 0 28px;
   display: flex;
   align-items: center;
@@ -102,6 +106,7 @@ kbd {
 }
 .brand {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   color: var(--ink);
@@ -110,12 +115,15 @@ kbd {
 .brand strong {
   font-size: 17px;
   letter-spacing: -0.35px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .brand-mark {
   display: grid;
   place-items: center;
   width: 31px;
   height: 31px;
+  flex-shrink: 0;
   background: var(--blue);
   color: white;
   border-radius: 7px;
@@ -133,6 +141,7 @@ kbd {
   align-items: center;
   gap: 10px;
   width: 270px;
+  flex-shrink: 0;
   margin-left: auto;
   background: var(--subtle);
   color: var(--muted);
@@ -146,15 +155,23 @@ kbd {
   margin-left: auto;
   font-size: 11px;
 }
+.theme-toggle {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  padding: 0;
+  font-size: 21px;
+  background: var(--subtle);
+}
 .mobile-menu {
   display: none;
 }
 .sidebar {
   position: fixed;
-  top: 66px;
+  top: var(--topbar-height);
   bottom: 0;
   left: 0;
-  width: 276px;
+  width: var(--sidebar-width);
   padding: 26px 18px 16px 22px;
   background: var(--subtle);
   overflow-y: auto;
@@ -175,6 +192,7 @@ kbd {
   border-radius: 6px;
   color: var(--ink);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .root-directory[aria-current],
 .nav-tree a[aria-current] {
@@ -224,23 +242,32 @@ kbd {
   padding-left: 12px;
 }
 .page-layout {
-  margin-left: 276px;
+  margin-left: var(--sidebar-width);
   display: grid;
-  grid-template-columns: minmax(0, 860px) 204px;
-  gap: 42px;
-  max-width: 1300px;
-  padding: 32px 40px 60px;
+  grid-template-columns: minmax(0, var(--content-width)) clamp(192px, 14vw, 248px);
+  justify-content: center;
+  gap: clamp(24px, 2.5vw, 48px);
+  padding: 32px var(--page-gutter) 60px;
+}
+.page-layout:not(:has(.page-toc)) {
+  grid-template-columns: minmax(0, var(--content-width));
 }
 .page-layout main {
   min-width: 0;
 }
 .document-context {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 9px;
   color: var(--muted);
   font-size: 12px;
   margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.document-context > * {
+  min-width: 0;
+  max-width: 100%;
 }
 .document-context > a {
   color: var(--muted);
@@ -258,6 +285,8 @@ kbd {
   margin-bottom: 22px;
 }
 .document-tools > code {
+  flex: 1 1 220px;
+  min-width: 0;
   font-size: 10.5px;
   color: var(--muted);
   overflow-wrap: anywhere;
@@ -274,9 +303,10 @@ kbd {
 }
 .page-toc {
   position: sticky;
-  top: 104px;
-  max-height: calc(100vh - 138px);
+  top: calc(var(--topbar-height) + 32px);
+  max-height: calc(100dvh - var(--topbar-height) - 64px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   align-self: start;
   scrollbar-width: thin;
   padding: 0 4px;
@@ -318,6 +348,7 @@ kbd {
 }
 .document-footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 20px;
   color: var(--muted);
@@ -325,6 +356,7 @@ kbd {
   margin-top: 42px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
 }
 .inline-notice {
   background: var(--blue-soft);
@@ -368,7 +400,7 @@ kbd {
 .markdown-body h6 {
   line-height: 1.45;
   color: var(--ink);
-  scroll-margin-top: 92px;
+  scroll-margin-top: calc(var(--topbar-height) + 26px);
 }
 .markdown-body h1 {
   font-size: 29px;
@@ -562,6 +594,9 @@ dialog::backdrop {
   max-height: 75dvh;
   margin: 12dvh auto auto;
 }
+body:has(dialog[open]) {
+  overflow: hidden;
+}
 .search-bar {
   display: flex;
   gap: 12px;
@@ -615,6 +650,7 @@ dialog::backdrop {
 .search-result strong {
   display: block;
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 .search-result code {
   display: block;
@@ -647,30 +683,9 @@ dialog::backdrop {
   align-items: center;
   margin-bottom: 24px;
 }
-@media (min-width: 1700px) {
+@media (max-width: 1280px) {
   .page-layout {
-    gap: 56px;
-    padding-left: 64px;
-  }
-}
-@media (max-width: 1200px) {
-  .sidebar {
-    width: 244px;
-  }
-  .page-layout {
-    margin-left: 244px;
-    padding: 28px;
-    grid-template-columns: minmax(0, 1fr) 168px;
-    gap: 24px;
-  }
-  .page-toc a {
-    font-size: 11px;
-  }
-}
-@media (max-width: 1020px) {
-  .page-layout {
-    display: block;
-    max-width: 1050px;
+    grid-template-columns: minmax(0, var(--content-width));
   }
   .page-toc {
     display: none;
@@ -679,54 +694,54 @@ dialog::backdrop {
     display: block;
     font-size: 12px;
     margin: 15px 0;
-    padding: 10px 13px;
+    padding: 0 13px;
     background: var(--subtle);
     border-radius: 6px;
   }
   .mobile-toc summary {
     cursor: pointer;
     color: var(--muted);
+    padding: 11px 0;
   }
   .mobile-toc nav {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 12px 0;
+    gap: 2px;
+    padding-bottom: 12px;
+    max-height: min(50dvh, 420px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .mobile-toc a {
+    padding: 8px;
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+  }
+  .mobile-toc .toc-level-3 {
+    padding-left: 20px;
+  }
+  .mobile-toc a[aria-current] {
+    background: var(--blue-soft);
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 960px) {
+  :root {
+    --sidebar-width: 0px;
+  }
   .topbar {
-    height: 60px;
-    padding: 0 16px;
+    padding: 0 var(--page-gutter);
     gap: 12px;
   }
   .brand {
-    gap: 7px;
-  }
-  .brand strong {
-    font-size: 15px;
+    flex: 1;
   }
   .brand-label {
     display: none;
   }
-  .brand-mark {
-    width: 27px;
-    height: 27px;
-    font-size: 10px;
-  }
-  .search-trigger {
-    width: auto;
-    padding: 6px 10px;
-    gap: 5px;
-  }
-  .search-trigger > span:nth-child(2) {
-    font-size: 12px;
-  }
-  .search-trigger kbd {
-    display: none;
-  }
   .mobile-menu {
     display: block;
+    flex-shrink: 0;
     background: transparent;
     white-space: nowrap;
     font-size: 12px;
@@ -736,21 +751,61 @@ dialog::backdrop {
   .sidebar {
     display: none;
   }
+  .navigation-dialog .nav-tree a,
+  .navigation-dialog summary,
+  .navigation-dialog .root-directory,
+  .dialog-heading button,
+  .mobile-toc a {
+    min-height: 44px;
+    font-size: 13px;
+  }
+}
+@media (max-width: 760px) {
+  :root {
+    --topbar-height: 60px;
+    --page-gutter: 20px;
+  }
+  .topbar {
+    padding: 0 16px;
+    gap: 7px;
+  }
+  .brand {
+    gap: 7px;
+  }
+  .brand strong {
+    font-size: 15px;
+  }
+  .brand-mark {
+    display: none;
+  }
+  .theme-toggle {
+    width: 44px;
+    height: 44px;
+  }
+  .search-trigger {
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+    padding: 6px 10px;
+    gap: 5px;
+  }
+  .search-trigger > span:nth-child(2),
+  .search-trigger kbd {
+    display: none;
+  }
   .page-layout {
-    margin-left: 0;
-    padding: 24px 20px 48px;
-    max-width: 100%;
+    padding-block: 24px 48px;
   }
   .document-tools {
     gap: 8px;
     margin-bottom: 22px;
   }
   .document-tools > code {
-    width: 100%;
+    flex-basis: 100%;
     font-size: 10px;
   }
   .document-tools button {
-    min-height: 36px;
+    min-height: 44px;
     font-size: 11px;
   }
   .document-context {
@@ -776,6 +831,7 @@ dialog::backdrop {
   }
   .markdown-body th,
   .markdown-body td {
+    min-width: 160px;
     padding: 9px 10px;
   }
   .diagram-canvas {
@@ -796,7 +852,7 @@ dialog::backdrop {
     gap: 9px;
   }
   .search-bar input {
-    font-size: 13px;
+    font-size: 16px;
     min-height: 44px;
   }
   .search-status > span {
@@ -807,12 +863,6 @@ dialog::backdrop {
   }
   .search-result {
     padding: 13px 10px;
-  }
-  .navigation-dialog .nav-tree a,
-  .navigation-dialog summary,
-  .navigation-dialog .root-directory {
-    min-height: 44px;
-    font-size: 13px;
   }
   .document-footer {
     font-size: 10px;
@@ -882,9 +932,6 @@ dialog::backdrop {
   --blue: #8eb5ff;
   --blue-soft: #283d60;
 }
-.theme-toggle { width: 38px; height: 38px; flex-shrink: 0; padding: 0; font-size: 21px; background: var(--subtle); }
-.brand { min-width: 0; }
-.brand strong { overflow: hidden; text-overflow: ellipsis; }
 .hljs { color: var(--ink); }
 .hljs-keyword, .hljs-selector-tag, .hljs-literal { color: #b32147; }
 .hljs-string, .hljs-regexp, .hljs-addition { color: #17613b; }
@@ -896,15 +943,6 @@ dialog::backdrop {
 :root[data-theme='dark'] .hljs-title, :root[data-theme='dark'] .hljs-section, :root[data-theme='dark'] .hljs-function { color: #ccaeef; }
 :root[data-theme='dark'] .hljs-number, :root[data-theme='dark'] .hljs-attr, :root[data-theme='dark'] .hljs-built_in, :root[data-theme='dark'] .hljs-type { color: #99c3ff; }
 .search-result mark { color: var(--ink); background: var(--blue-soft); font-weight: 650; }
-@media (max-width: 760px) {
-  .topbar { gap: 7px; }
-  .brand { flex: 1; }
-  .brand-mark { display: none; }
-  .theme-toggle { width: 44px; height: 44px; }
-  .search-trigger { min-height: 44px; }
-  .search-trigger > span:nth-child(2) { display: none; }
-  .document-tools button { min-height: 44px; }
-}
 @media print {
   :root { color-scheme: light; --paper: #fff; --ink: #20324b; --subtle: #f7f9fc; --surface: #f2f5f9; --line: #dce4ef; --muted: #65758c; }
 }

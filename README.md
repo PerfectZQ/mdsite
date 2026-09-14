@@ -4,5 +4,5 @@
 
 生成的单个 HTML 内含 UI、文档、搜索数据和本地图片，可离线打开，也可由任意语言的服务或静态服务器托管。
 
-- [QUICK START](QUICK_START.md)：从公网安装，自动更新 UI 资源并集成到业务项目的构建流程。
-- [开发指南](CONTRIBUTING.md)：面向开发者，包含本地开发、工程结构、检查测试和 GitHub 发版。
+- [QUICK START](doc/QUICK_START.md)：从公网安装，自动更新 UI 资源并集成到业务项目的构建流程。
+- [开发指南](doc/CONTRIBUTING.md)：面向开发者，包含本地开发、工程结构、检查测试和 GitHub 发版。

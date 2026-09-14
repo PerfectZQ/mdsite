@@ -1,6 +1,6 @@
 {
   "name": "mdsite",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Turn Markdown in any project into a searchable, self-contained documentation UI.",
   "license": "UNLICENSED",
   "repository": {
@@ -13,8 +13,8 @@
     "mdsite": "dist/cli.js"
   },
   "files": [
-    "QUICK_START.md",
-    "CONTRIBUTING.md",
+    "doc/QUICK_START.md",
+    "doc/CONTRIBUTING.md",
     "examples/build-with-docs.sh",
     "dist/**/*.js",
     "dist/assets/*.css",
