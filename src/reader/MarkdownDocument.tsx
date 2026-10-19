@@ -14,11 +14,13 @@ export function MarkdownDocument({
     heading,
     theme,
     onSourceLink,
+    onLocate,
 }: {
     document: DocumentRecord
     heading: string
     theme: string
     onSourceLink: (path: string, directory: boolean) => void
+    onLocate: () => void
 }) {
     const article = useRef<HTMLElement>(null)
     const [blocks, setBlocks] = useState<CodeMount[]>([])
@@ -80,6 +82,10 @@ export function MarkdownDocument({
             <div className="document-tools">
                 <code>{current.path}</code>
                 <div>
+                    <button onClick={onLocate} title="在文档目录中定位当前文件">
+                        <Icon name="folder" />
+                        定位到目录
+                    </button>
                     <CopyButton text={() => window.location.href} label="复制链接" icon="link" />
                     <button
                         onClick={() => {

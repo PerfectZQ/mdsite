@@ -16,7 +16,7 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
     const content = useRef<HTMLElement>(null)
     const selectedPath = route.path || catalog.home
     const documentPath = catalog.aliases[selectedPath] || selectedPath
-    const [revealedDirectory, setRevealedDirectory] = useState<{path: string} | null>(null)
+    const [revealRequest, setRevealRequest] = useState<{path: string} | null>(null)
     const current = useMemo(
         () => catalog.documents.find(document => document.path === documentPath),
         [catalog, documentPath],
@@ -85,10 +85,14 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
         return () => observer.disconnect()
     }, [current, theme])
 
+    const revealPath = (path: string) => {
+        setRevealRequest({path})
+        if (window.matchMedia('(max-width: 960px)').matches) mobileNavigation.current?.showModal()
+    }
+
     const onSourceLink = (path: string, isDirectory: boolean) => {
         if (isDirectory && catalog.documents.some(document => document.path.startsWith(path))) {
-            setRevealedDirectory({path: path.replace(/\/$/, '')})
-            if (window.matchMedia('(max-width: 960px)').matches) mobileNavigation.current?.showModal()
+            revealPath(path.replace(/\/$/, ''))
             return
         }
         setSourceNotice(`此链接指向文件 ${path}，请在项目目录中查看。`)
@@ -139,7 +143,7 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
                 <Navigation
                     catalog={catalog}
                     selected={selectedPath === '' ? catalog.home : selectedPath}
-                    revealedDirectory={revealedDirectory}
+                    revealRequest={revealRequest}
                 />
                 <div className="sidebar-footer">{catalog.documents.length} 篇文档</div>
             </aside>
@@ -196,6 +200,7 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
                                 heading={route.heading}
                                 theme={theme}
                                 onSourceLink={onSourceLink}
+                                onLocate={() => revealPath(selectedPath)}
                             />
                         </>
                     ) : (
@@ -250,7 +255,7 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
                 <Navigation
                     catalog={catalog}
                     selected={selectedPath === '' ? catalog.home : selectedPath}
-                    revealedDirectory={revealedDirectory}
+                    revealRequest={revealRequest}
                     onNavigate={() => mobileNavigation.current?.close()}
                 />
             </dialog>

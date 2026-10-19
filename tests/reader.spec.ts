@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test'
-import {mkdtemp, mkdir, writeFile, rm, readFile} from 'node:fs/promises'
+import {mkdtemp, mkdir, writeFile, rm, readFile, symlink} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join, resolve} from 'node:path'
 import {once} from 'node:events'
@@ -15,6 +15,7 @@ const flowchart =
 const sequence =
     'sequenceDiagram\n  participant A as 作者\n  participant B as 构建器\n  A->>B: build\n  Note right of B: 读取 Markdown\n  B-->>A: HTML'
 const fence = (lang: string, text: string) => `\n\n\`\`\`${lang}\n${text}${text.endsWith('\n') ? '' : '\n'}\`\`\`\n`
+const locatedPath = '.feature/leadengine/20261015-211807-业务结果稽核/README.md'
 let root: string
 let url: string
 let server: ChildProcess
@@ -44,6 +45,14 @@ test.beforeAll(async () => {
         join(root, 'guide/broken.md'),
         '# 错误图表\n' + fence('mermaid', 'not-a-real-diagram !!!') + fence('mermaid', flowchart),
     )
+    await mkdir(join(root, '.feature/leadengine/20261015-211807-业务结果稽核'), {recursive: true})
+    await writeFile(join(root, locatedPath), '# 业务结果稽核\n\n## 结果\n\n定位当前文档所在目录。\n')
+    for (let index = 0; index < 40; index++) {
+        const directory = join(root, '.feature/leadengine', `20260901-${String(index).padStart(2, '0')}`)
+        await mkdir(directory)
+        await writeFile(join(directory, 'README.md'), '# 历史文档\n')
+    }
+    await symlink(locatedPath, join(root, '入口.md'))
     server = spawn(process.execPath, [resolve('dist/cli.js'), 'serve', root, '--addr', '127.0.0.1:0'], {
         stdio: ['ignore', 'pipe', 'inherit'],
     })
@@ -165,6 +174,60 @@ test('invalid Mermaid exposes its source and does not prevent the next diagram f
     await expect(page.locator('.diagram-image svg')).toHaveCount(1)
     await page.getByRole('button', {name: '切换为深色主题'}).click()
     await expect(page.locator('.diagram-image svg')).toHaveCount(1)
+})
+
+for (const width of [1600, 390]) {
+    test(`${width}px locates a document in a long collapsed tree and supports repeated keyboard activation`, async ({
+        page,
+    }) => {
+        await page.setViewportSize({width, height: 844})
+        await page.emulateMedia({reducedMotion: 'reduce'})
+        await page.goto(`${url}/#/${locatedPath}?heading=${encodeURIComponent('结果')}`)
+        const initialURL = page.url()
+        const mobile = width <= 960
+        const navigation = page.locator(mobile ? '.navigation-dialog' : '.sidebar')
+        const locate = page.getByRole('button', {name: '定位到目录', exact: true})
+        const file = navigation.locator(`[data-path="${locatedPath}"]`)
+        if (mobile) await page.getByRole('button', {name: '打开文档目录'}).click()
+        for (let attempt = 0; attempt < 2; attempt++) {
+            await navigation.getByRole('button', {name: '折叠所有目录'}).click()
+            await expect(file).toHaveCount(0)
+            if (mobile) await page.keyboard.press('Escape')
+            await locate.focus()
+            await page.keyboard.press('Enter')
+            await expect(file).toBeFocused()
+            await expect(file).toHaveAttribute('aria-selected', 'true')
+            await expect(file).toBeInViewport({ratio: 1})
+            await expect(navigation.locator('[data-path=".feature/leadengine"]')).toHaveAttribute(
+                'aria-expanded',
+                'true',
+            )
+            await expect(navigation.locator('[role="treeitem"][tabindex="0"]')).toHaveCount(1)
+            expect(await navigation.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+            expect(page.url()).toBe(initialURL)
+        }
+        if (mobile) {
+            await page.keyboard.press('Escape')
+            await expect(locate).toBeFocused()
+            await expect(navigation).not.toBeVisible()
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    })
+}
+
+test('locates root documents and the selected alias after navigation', async ({page}) => {
+    await page.goto(url)
+    const tree = page.getByRole('tree', {name: '项目文件'})
+    const locate = page.getByRole('button', {name: '定位到目录', exact: true})
+    await locate.click()
+    await expect(tree.locator('[data-path="README.md"]')).toBeFocused()
+    await tree.getByRole('treeitem', {name: '入口.md'}).click()
+    await locate.click()
+    await expect(tree.getByRole('treeitem', {name: '入口.md'})).toBeFocused()
+    await expect(tree.getByRole('treeitem', {name: '入口.md'})).toHaveAttribute('aria-selected', 'true')
+    await tree.locator('[data-path="README.md"]').click()
+    await locate.click()
+    await expect(tree.locator('[data-path="README.md"]')).toBeFocused()
 })
 
 test('390px reader contains wide content, supports mobile navigation and reduced motion', async ({page}) => {

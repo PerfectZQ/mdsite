@@ -40,12 +40,12 @@ function ancestors(path: string) {
 export function Navigation({
     catalog,
     selected,
-    revealedDirectory,
+    revealRequest,
     onNavigate = () => {},
 }: {
     catalog: Catalog
     selected: string
-    revealedDirectory: {path: string} | null
+    revealRequest: {path: string} | null
     onNavigate?: () => void
 }) {
     const navigation = useRef<HTMLElement>(null)
@@ -72,12 +72,12 @@ export function Navigation({
         setFocused(selected)
     }, [selected])
     useEffect(() => {
-        if (!revealedDirectory) return
-        const {path} = revealedDirectory
+        if (!revealRequest) return
+        const {path} = revealRequest
         revealFocus.current = path
         setOpen(previous => new Set([...previous, ...ancestors(path), path]))
         setFocused(path)
-    }, [revealedDirectory])
+    }, [revealRequest])
     useEffect(() => {
         if (!revealFocus.current) return
         const frame = requestAnimationFrame(() => {
@@ -85,10 +85,10 @@ export function Navigation({
                 row => row.dataset.path === revealFocus.current,
             )
             if (element?.checkVisibility()) {
-                element.scrollIntoView({block: 'nearest'})
+                element.scrollIntoView({block: 'center', inline: 'nearest'})
                 element.focus({preventScroll: true})
-                revealFocus.current = ''
             }
+            revealFocus.current = ''
         })
         return () => cancelAnimationFrame(frame)
     }, [open])
