@@ -2,28 +2,26 @@ import {useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {CodeBlock} from './CodeBlock'
 import {MermaidDiagram} from './MermaidDiagram'
-import {CopyButton} from './CopyButton'
-import {Icon} from './Icon'
-import {documentHref} from './navigation'
+import {documentHref, readingOffset, type DocumentRoute} from './navigation'
+import {highlightSearch} from './search/highlight'
 import type {DocumentRecord} from '../catalog.ts'
 
 type CodeMount = {element: HTMLElement; source: string; language: string}
 
 export function MarkdownDocument({
     document: current,
-    heading,
+    route,
     theme,
     onSourceLink,
-    onLocate,
 }: {
     document: DocumentRecord
-    heading: string
+    route: DocumentRoute
     theme: string
     onSourceLink: (path: string, directory: boolean) => void
-    onLocate: () => void
 }) {
     const article = useRef<HTMLElement>(null)
     const [blocks, setBlocks] = useState<CodeMount[]>([])
+    const previousRoute = useRef<DocumentRoute | null>(null)
     // Navigation updates must preserve the DOM containers owned by the portals.
     const body = useMemo(() => ({__html: current.html}), [current.html])
     useEffect(() => {
@@ -58,54 +56,64 @@ export function MarkdownDocument({
     }, [current])
 
     useEffect(() => {
-        if (!heading) return
         const element = article.current!
-        const target = document.getElementById(heading)
+        const highlight = highlightSearch(element, route.query, route.heading)
+        const previous = previousRoute.current
+        previousRoute.current = route
+        const clearedSearch =
+            previous?.query && !route.query && previous.path === route.path && previous.heading === route.heading
+        if ((!route.heading && !route.query) || clearedSearch) return highlight.clear
+        const target =
+            highlight.target?.startContainer.parentElement || document.getElementById(route.heading) || element
+        for (
+            let container: HTMLElement | null = target;
+            container && container !== element;
+            container = container.parentElement
+        ) {
+            if (container instanceof HTMLDetailsElement) container.open = true
+        }
+        if (target) {
+            target.tabIndex = -1
+            target.focus({preventScroll: true})
+        }
+        const align = () => {
+            if (highlight.target) {
+                // Reveal a code hit inside its own horizontal scroller before positioning the page.
+                highlight.target.startContainer.parentElement?.scrollIntoView({block: 'nearest', inline: 'nearest'})
+                window.scrollBy(0, highlight.target.getBoundingClientRect().top - readingOffset())
+            } else if (target) {
+                target.scrollIntoView({block: 'start'})
+                window.scrollBy(0, target.getBoundingClientRect().top - readingOffset())
+            }
+        }
         // Keep deep links aligned while diagrams load, until the reader takes control.
         const observer = new ResizeObserver(() => {
-            target?.scrollIntoView({block: 'start'})
+            align()
             if (!element.querySelector('[aria-busy="true"]')) observer.disconnect()
         })
         observer.observe(element)
+        const frame = requestAnimationFrame(align)
         const input = new AbortController()
         for (const event of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
-            window.addEventListener(event, () => observer.disconnect(), {signal: input.signal, passive: true})
+            window.addEventListener(
+                event,
+                () => {
+                    observer.disconnect()
+                    cancelAnimationFrame(frame)
+                },
+                {signal: input.signal, passive: true},
+            )
         }
         return () => {
             observer.disconnect()
+            cancelAnimationFrame(frame)
             input.abort()
+            highlight.clear()
         }
-    }, [current, heading, blocks])
+    }, [current, route, blocks])
 
     return (
         <>
-            <div className="document-tools">
-                <code>{current.path}</code>
-                <div>
-                    <button onClick={onLocate} title="在文档目录中定位当前文件">
-                        <Icon name="folder" />
-                        定位到目录
-                    </button>
-                    <CopyButton text={() => window.location.href} label="复制链接" icon="link" />
-                    <button
-                        onClick={() => {
-                            const url = URL.createObjectURL(
-                                new Blob([current.source], {
-                                    type: 'text/markdown;charset=utf-8',
-                                }),
-                            )
-                            const link = document.createElement('a')
-                            link.href = url
-                            link.download = current.path.split('/').at(-1)!
-                            link.click()
-                            setTimeout(() => URL.revokeObjectURL(url), 1000)
-                        }}
-                    >
-                        <Icon name="download" />
-                        下载 Markdown
-                    </button>
-                </div>
-            </div>
             <article
                 ref={article}
                 className="markdown-body"
@@ -133,12 +141,6 @@ export function MarkdownDocument({
                     String(index),
                 ),
             )}
-            <footer className="document-footer">
-                <span>文档来源于仓库 Markdown</span>
-                <a href={documentHref(current.path)} onClick={() => window.scrollTo(0, 0)}>
-                    返回文首 ↑
-                </a>
-            </footer>
         </>
     )
 }

@@ -164,15 +164,31 @@ export async function renderMarkdown(
     }
 
     await visit(document)
-    const text = plain(document).replace(/\s+/g, ' ').trim()
+    const sections: DocumentRecord['sections'] = []
+    let section = {heading: '', text: ''}
+    const finishSection = () => {
+        section.text = section.text.replace(/\s+/g, ' ').trim()
+        if (section.text) sections.push(section)
+    }
+    function collectSections(node: Node) {
+        if ('tagName' in node && /^h[1-6]$/.test(node.tagName)) {
+            finishSection()
+            section = {heading: attribute(node, 'id'), text: ''}
+        }
+        if (node.nodeName === '#text') section.text += (node as DefaultTreeAdapterTypes.TextNode).value
+        if ('childNodes' in node) node.childNodes.forEach(collectSections)
+        if ('tagName' in node && /^(p|li|pre|td|th|br|h[1-6]|dt|dd)$/.test(node.tagName)) section.text += ' '
+    }
+    collectSections(document)
+    finishSection()
     return {
         path,
         source,
         html: serialize(document),
         headings,
-        text,
+        sections,
         title: headings[0]?.title || posix.basename(path, posix.extname(path)),
         summary: [...summary].slice(0, 150).join(''),
-        words: [...text].length,
+        words: sections.reduce((sum, section) => sum + [...section.text].length, 0),
     }
 }

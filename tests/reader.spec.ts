@@ -29,6 +29,7 @@ test.beforeAll(async () => {
         join(root, 'README.md'),
         '# 阅读器验收\n\n[深入文档](guide/deep/rendering.md)\n\n[目录入口](guide/deep/)\n',
     )
+    await writeFile(join(root, 'plain.md'), '没有标题的页面，也能通过文件名搜索打开。\n')
     await writeFile(
         join(root, 'guide/deep/rendering.md'),
         '# 技术文档\n\n正文与 **强调**，`inline code`。\n\n## 代码\n' +
@@ -44,6 +45,15 @@ test.beforeAll(async () => {
     await writeFile(
         join(root, 'guide/broken.md'),
         '# 错误图表\n' + fence('mermaid', 'not-a-real-diagram !!!') + fence('mermaid', flowchart),
+    )
+    await writeFile(
+        join(root, 'guide/deep/a-reading.md'),
+        '# 阅读流程\n\n开场说明。\n\n## 概览\n\n' +
+            '用于验证长文中的搜索落点与章节导航。\n\n'.repeat(60) +
+            '## 校验\n\n### Linux\n\n使用 **sha256**sum 完成校验。\n' +
+            fence('sh', 'sha256sum -c mdsite.tgz.sha256') +
+            '\n## 附录\n\n<details><summary>隐藏步骤</summary><p>only-hidden-token</p></details>\n\n' +
+            '附录保留足够空间，让目标段落能够准确对齐。\n\n'.repeat(30),
     )
     await mkdir(join(root, '.feature/leadengine/20261015-211807-业务结果稽核'), {recursive: true})
     await writeFile(join(root, locatedPath), '# 业务结果稽核\n\n## 结果\n\n定位当前文档所在目录。\n')
@@ -148,6 +158,8 @@ test('file tree supports arrow keys, one tab stop, collapse and directory links'
     await expect(deep).toBeFocused()
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowDown')
+    await expect(tree.getByRole('treeitem', {name: 'a-reading.md'})).toBeFocused()
+    await page.keyboard.press('ArrowDown')
     await expect(tree.getByRole('treeitem', {name: 'rendering.md'})).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(/guide\/deep\/rendering.md/)
@@ -193,6 +205,7 @@ for (const width of [1600, 390]) {
             await navigation.getByRole('button', {name: '折叠所有目录'}).click()
             await expect(file).toHaveCount(0)
             if (mobile) await page.keyboard.press('Escape')
+            await page.locator('.document-actions > summary').click()
             await locate.focus()
             await page.keyboard.press('Enter')
             await expect(file).toBeFocused()
@@ -208,7 +221,7 @@ for (const width of [1600, 390]) {
         }
         if (mobile) {
             await page.keyboard.press('Escape')
-            await expect(locate).toBeFocused()
+            await expect(page.locator('.document-actions > summary')).toBeFocused()
             await expect(navigation).not.toBeVisible()
         }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -219,13 +232,16 @@ test('locates root documents and the selected alias after navigation', async ({p
     await page.goto(url)
     const tree = page.getByRole('tree', {name: '项目文件'})
     const locate = page.getByRole('button', {name: '定位到目录', exact: true})
+    await page.locator('.document-actions > summary').click()
     await locate.click()
     await expect(tree.locator('[data-path="README.md"]')).toBeFocused()
     await tree.getByRole('treeitem', {name: '入口.md'}).click()
+    await page.locator('.document-actions > summary').click()
     await locate.click()
     await expect(tree.getByRole('treeitem', {name: '入口.md'})).toBeFocused()
     await expect(tree.getByRole('treeitem', {name: '入口.md'})).toHaveAttribute('aria-selected', 'true')
     await tree.locator('[data-path="README.md"]').click()
+    await page.locator('.document-actions > summary').click()
     await locate.click()
     await expect(tree.locator('[data-path="README.md"]')).toBeFocused()
 })
@@ -273,4 +289,177 @@ test('deep links remain aligned after diagrams finish; generated pages work with
     await page.locator('.search-result').first().click()
     await expect(page.locator('.diagram-error')).toBeVisible()
     await expect(page.locator('.diagram-image svg')).toHaveCount(1)
+})
+
+for (const width of [1440, 390]) {
+    test(`${width}px search opens the matching section offline, highlights formatted text and can reselect the same result`, async ({
+        page,
+        context,
+    }) => {
+        const errors: string[] = []
+        page.on('pageerror', error => errors.push(error.message))
+        await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+        await page.setViewportSize({width, height: 844})
+        await page.goto(url)
+        await context.setOffline(true)
+        await page.getByRole('button', {name: '搜索文档', exact: true}).click()
+        await page.getByRole('searchbox').fill('sha256sum')
+        const result = page.locator('.search-result')
+        await expect(result).toHaveCount(1)
+        await expect(result.locator('.search-section')).toHaveText('校验 / Linux')
+        await expect(result).toHaveAttribute('href', /heading=linux&q=sha256sum/)
+        await page.getByRole('searchbox').press('Enter')
+        const hit = page.locator('article p[data-search-match]').first()
+        await expect(hit).toHaveText('使用 sha256sum 完成校验。')
+        await expect(hit).toBeInViewport({ratio: 1})
+        expect(
+            await page.evaluate(() =>
+                [...CSS.highlights.get('mdsite-search')!].some(range => range.toString() === 'sha256sum'),
+            ),
+        ).toBe(true)
+        await expect(page.locator('article strong')).toHaveText('sha256')
+        const code = page.locator('.code-block code')
+        await expect(code).toHaveText('sha256sum -c mdsite.tgz.sha256')
+        await page.getByRole('button', {name: '复制代码', exact: true}).click()
+        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('sha256sum -c mdsite.tgz.sha256\n')
+        await page.getByRole('button', {name: '切换为深色主题'}).click()
+        await expect(code).toHaveText('sha256sum -c mdsite.tgz.sha256')
+        await page.evaluate(() => scrollTo(0, 0))
+        await page.getByRole('button', {name: '搜索文档', exact: true}).click()
+        await result.click()
+        await expect(hit).toBeInViewport({ratio: 1})
+        await context.setOffline(false)
+        await page.reload()
+        await expect(hit).toBeInViewport({ratio: 1})
+        await expect(page.getByRole('button', {name: '清除高亮'})).toBeInViewport({ratio: 1})
+        await page.getByRole('button', {name: '清除高亮'}).click()
+        await expect(page.locator('[data-search-match]')).toHaveCount(0)
+        await expect(page.locator('article p').filter({hasText: '使用 sha256sum 完成校验。'})).toBeInViewport({
+            ratio: 1,
+        })
+        expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0)
+        expect(page.url()).not.toContain('&q=')
+        expect(errors).toEqual([])
+    })
+}
+
+test('filename search opens a heading-free document at the top after leaving a long page', async ({page}) => {
+    await page.goto(`${url}/#/guide/deep/a-reading.md`)
+    await page.evaluate(() => scrollTo(0, 1800))
+    await page.getByRole('button', {name: '搜索文档', exact: true}).click()
+    await page.getByRole('searchbox').fill('plain.md')
+    await expect(page.locator('.search-result')).toHaveCount(1)
+    await page.locator('.search-result').click()
+    await expect(page.locator('article')).toContainText('没有标题的页面')
+    await expect(page.locator('article')).toBeInViewport({ratio: 1})
+    expect(await page.evaluate(() => scrollY)).toBe(0)
+})
+
+test('search reveals collapsed content and retains a highlight fallback without changing Markdown', async ({page}) => {
+    await page.addInitScript(() => {
+        Object.defineProperty(window, 'Highlight', {value: undefined, configurable: true})
+    })
+    await page.goto(`${url}/#/guide/deep/a-reading.md?heading=${encodeURIComponent('附录')}&q=only-hidden-token`)
+    const details = page.locator('article details')
+    await expect(details).toHaveAttribute('open', '')
+    await expect(details.locator('.search-hit')).toHaveText('only-hidden-token')
+    await expect(details.locator('.search-hit')).toBeInViewport({ratio: 1})
+    await page.evaluate(() => scrollTo(0, 0))
+    await page.getByRole('button', {name: '清除高亮'}).click()
+    await expect(page.locator('.search-hit')).toHaveCount(0)
+    await expect(details.locator('p')).toHaveText('only-hidden-token')
+})
+
+for (const width of [390, 1280]) {
+    test(`${width}px chapter navigation remains reachable mid-document and separates chapters from files`, async ({
+        page,
+    }) => {
+        await page.setViewportSize({width, height: 844})
+        await page.goto(`${url}/#/guide/deep/a-reading.md`)
+        await page.evaluate(() => scrollTo(0, 1800))
+        const chapters = page.locator('.mobile-chapters')
+        const summary = chapters.locator('summary')
+        await expect(summary).toBeInViewport({ratio: 1})
+        expect(Math.round((await summary.boundingBox())!.y)).toBe(width === 390 ? 60 : 66)
+        await summary.click()
+        await expect(chapters.getByRole('link', {name: 'Linux', exact: true})).toBeVisible()
+        await page.keyboard.press('Escape')
+        await expect(chapters).not.toHaveAttribute('open', '')
+        await expect(summary).toBeFocused()
+        await summary.press('Enter')
+        await chapters.getByRole('link', {name: 'Linux', exact: true}).click()
+        await expect(chapters).not.toHaveAttribute('open', '')
+        await expect(page.locator('#linux')).toBeFocused()
+        await expect
+            .poll(async () => Math.round((await page.locator('#linux').boundingBox())!.y))
+            .toBe(width === 390 ? 130 : 136)
+        await expect(summary).toContainText('Linux')
+        if (width === 390) {
+            await page.getByRole('button', {name: '打开文档目录'}).click()
+            const files = page.getByRole('dialog', {name: '文档目录', exact: true})
+            await expect(files.getByRole('treeitem', {name: 'a-reading.md', exact: true})).toBeVisible()
+            await page.keyboard.press('Escape')
+        }
+    })
+}
+
+test('reading preferences preserve compact defaults, persist across navigation and reload, and remain keyboard accessible', async ({
+    page,
+}) => {
+    await page.goto(`${url}/#/guide/deep/a-reading.md`)
+    const article = page.locator('article')
+    await expect(article).toHaveCSS('font-size', '14px')
+    const standardWidth = (await article.boundingBox())!.width
+    await page.getByRole('button', {name: '阅读设置'}).click()
+    await page.getByRole('radio', {name: '舒适', exact: true}).check()
+    await page.getByRole('radio', {name: '窄栏', exact: true}).check()
+    await expect(article).toHaveCSS('font-size', '16px')
+    expect((await article.boundingBox())!.width).toBeLessThan(standardWidth)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('button', {name: '阅读设置'})).toBeFocused()
+    await page.locator('.document-pagination .pagination-next').click()
+    await expect(page).toHaveURL(/rendering.md/)
+    await expect(page.locator('article')).toHaveCSS('font-size', '16px')
+    await page.reload()
+    await expect(page.locator('article')).toHaveCSS('font-size', '16px')
+    expect(await page.locator('html').getAttribute('data-reading-width')).toBe('narrow')
+    await page.getByRole('button', {name: '阅读设置'}).click()
+    await page.getByRole('radio', {name: '舒适', exact: true}).focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(page.getByRole('radio', {name: '大字', exact: true})).toBeChecked()
+    await page.getByRole('button', {name: '恢复默认'}).click()
+    await expect(page.locator('article')).toHaveCSS('font-size', '14px')
+    expect(await page.locator('html').getAttribute('data-reading-width')).toBe('standard')
+})
+
+test('mobile starts with content, keeps document actions available and labels real files with their titles', async ({
+    page,
+}) => {
+    await page.setViewportSize({width: 390, height: 844})
+    await page.goto(`${url}/#/guide/deep/a-reading.md`)
+    expect((await page.getByRole('heading', {name: '阅读流程', exact: true}).boundingBox())!.y).toBeLessThan(200)
+    expect((await page.locator('article p').first().boundingBox())!.y).toBeLessThan(260)
+    await expect(page.getByRole('button', {name: '下载 Markdown', exact: true})).not.toBeVisible()
+    await page.locator('.document-actions > summary').click()
+    await expect(page.locator('.document-actions code')).toHaveText('guide/deep/a-reading.md')
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', {name: '下载 Markdown', exact: true}).click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toBe('a-reading.md')
+    expect(await readFile((await download.path())!, 'utf8')).toContain('使用 **sha256**sum 完成校验。')
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', {name: '打开文档目录'}).click()
+    const file = page.locator('.navigation-dialog [data-path="guide/deep/a-reading.md"]')
+    await expect(file.locator('.tree-filename')).toHaveText('a-reading.md')
+    await expect(file.locator('.tree-title')).toHaveText('阅读流程')
+    await expect(file).toHaveAttribute('href', '#/guide/deep/a-reading.md')
+    await page.keyboard.press('Escape')
+    const next = page.locator('.document-pagination .pagination-next')
+    await expect(next).toHaveAttribute('href', '#/guide/deep/rendering.md')
+    await next.click()
+    await expect(page.locator('.document-pagination .pagination-previous')).toHaveAttribute(
+        'href',
+        '#/guide/deep/a-reading.md',
+    )
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

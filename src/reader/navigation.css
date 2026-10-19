@@ -86,9 +86,77 @@
     opacity: 0.85;
 }
 .tree-name {
+    min-width: 0;
+}
+.tree-filename,
+.tree-title {
+    display: block;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+.tree-title {
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 400;
+}
+
+.document-pagination {
+    margin-top: 36px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+}
+.pagination-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 12px;
+}
+.pagination-heading strong {
+    font-weight: 550;
+}
+.pagination-links {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+}
+.pagination-links a {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow-wrap: anywhere;
+}
+.pagination-links a:hover {
+    background: var(--subtle);
+}
+.pagination-links span,
+.pagination-links code {
+    color: var(--muted);
+    font-size: 11px;
+}
+.pagination-links code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pagination-links strong {
+    font-size: 13px;
+    font-weight: 550;
+}
+.pagination-next {
+    grid-column: 2;
+    text-align: right;
+}
+.document-pagination + .document-footer {
+    border-top: 0;
+    margin-top: 20px;
+    padding-top: 0;
 }
 .tree-indent {
     display: flex;

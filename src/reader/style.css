@@ -11,6 +11,8 @@
     --topbar-height: 66px;
     --sidebar-width: clamp(244px, 16vw, 300px);
     --content-width: 1040px;
+    --reader-font-size: 14px;
+    --reader-code-size: calc(var(--reader-font-size) * 0.857143);
     --page-gutter: clamp(24px, 3vw, 64px);
     --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
     font:
@@ -211,38 +213,12 @@ kbd {
     min-width: 0;
     max-width: 100%;
 }
-.document-context > a {
+.document-breadcrumb a {
     color: var(--muted);
 }
 .reading-time {
     margin-left: auto;
     white-space: nowrap;
-}
-.document-tools {
-    display: flex;
-    gap: 12px;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 22px;
-}
-.document-tools > code {
-    flex: 1 1 220px;
-    min-width: 0;
-    font-size: 10.5px;
-    color: var(--muted);
-    overflow-wrap: anywhere;
-}
-.document-tools > div {
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
-    max-width: 100%;
-}
-.document-tools button {
-    font-size: 11px;
-    padding: 5px 8px;
-    background: var(--subtle);
 }
 .page-toc {
     position: sticky;
@@ -286,7 +262,7 @@ kbd {
 .page-toc a:hover {
     color: var(--blue);
 }
-.mobile-toc {
+.reading-bar {
     display: none;
 }
 .document-footer {
@@ -322,11 +298,6 @@ kbd {
 .not-found code {
     overflow-wrap: anywhere;
 }
-.empty-message {
-    padding: 22px;
-    color: var(--muted);
-    font-size: 13px;
-}
 dialog {
     border: 0;
     padding: 0;
@@ -338,83 +309,7 @@ dialog {
 dialog::backdrop {
     background: #14233d59;
 }
-.search-dialog {
-    width: min(700px, calc(100vw - 40px));
-    max-height: 75dvh;
-    margin: 12dvh auto auto;
-}
 body:has(dialog[open]) {
-    overflow: hidden;
-}
-.search-bar {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    padding: 15px 20px;
-    border-bottom: 1px solid var(--line);
-}
-.search-bar > span {
-    font-size: 27px;
-    color: var(--muted);
-}
-.search-bar input {
-    min-width: 0;
-    flex: 1;
-    border: 0;
-    background: none;
-    color: var(--ink);
-    font-size: 15px;
-    padding: 8px 0;
-    outline: none;
-}
-.search-bar .quiet-button {
-    font-size: 11px;
-    color: var(--muted);
-}
-.search-status {
-    padding: 12px 20px;
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-}
-.search-results {
-    max-height: calc(75dvh - 118px);
-    overflow-y: auto;
-    padding: 0 10px 10px;
-    scrollbar-width: thin;
-}
-.search-result {
-    display: block;
-    padding: 14px 12px;
-    border-radius: 6px;
-    color: var(--ink);
-}
-.search-result:hover,
-.search-result:focus {
-    background: var(--blue-soft);
-    outline-offset: -2px;
-}
-.search-result strong {
-    display: block;
-    font-size: 14px;
-    overflow-wrap: anywhere;
-}
-.search-result code {
-    display: block;
-    font-size: 10px;
-    overflow-wrap: anywhere;
-    color: var(--muted);
-    margin: 3px 0;
-}
-.search-result p {
-    font-size: 12px;
-    color: var(--muted);
-    margin: 5px 0 0;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
     overflow: hidden;
 }
 .navigation-dialog {
@@ -433,45 +328,14 @@ body:has(dialog[open]) {
     margin-bottom: 24px;
 }
 @media (max-width: 1280px) {
+    :root:has(.reading-bar) {
+        --chapters-height: 44px;
+    }
     .page-layout {
         grid-template-columns: minmax(0, var(--content-width));
     }
     .page-toc {
         display: none;
-    }
-    .mobile-toc {
-        display: block;
-        font-size: 12px;
-        margin: 15px 0;
-        padding: 0 13px;
-        background: var(--subtle);
-        border-radius: 6px;
-    }
-    .mobile-toc summary {
-        cursor: pointer;
-        color: var(--muted);
-        padding: 11px 0;
-    }
-    .mobile-toc nav {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        padding-bottom: 12px;
-        max-height: min(50dvh, 420px);
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        scrollbar-width: thin;
-    }
-    .mobile-toc a {
-        padding: 8px;
-        border-radius: 4px;
-        overflow-wrap: anywhere;
-    }
-    .mobile-toc .toc-level-3 {
-        padding-left: 20px;
-    }
-    .mobile-toc a[aria-current] {
-        background: var(--blue-soft);
     }
 }
 @media (max-width: 960px) {
@@ -502,8 +366,7 @@ body:has(dialog[open]) {
     }
     .navigation-dialog .tree-row,
     .navigation-dialog .root-directory,
-    .dialog-heading button,
-    .mobile-toc a {
+    .dialog-heading button {
         min-height: 44px;
         font-size: 13px;
     }
@@ -512,6 +375,7 @@ body:has(dialog[open]) {
     :root {
         --topbar-height: 60px;
         --page-gutter: 20px;
+        --reader-code-size: calc(var(--reader-font-size) * 0.785714);
     }
     .topbar {
         padding: 0 16px;
@@ -542,44 +406,10 @@ body:has(dialog[open]) {
         display: none;
     }
     .page-layout {
-        padding-block: 24px 48px;
-    }
-    .document-tools {
-        gap: 8px;
-        margin-bottom: 22px;
-    }
-    .document-tools > code {
-        flex-basis: 100%;
-        font-size: 10px;
-    }
-    .document-tools button {
-        min-height: 44px;
-        font-size: 11px;
+        padding-block: 16px 48px;
     }
     .document-context {
         font-size: 11px;
-    }
-    .search-dialog {
-        width: calc(100vw - 20px);
-        margin-top: 20px;
-        max-height: calc(100dvh - 40px);
-    }
-    .search-bar {
-        padding: 10px 13px;
-        gap: 9px;
-    }
-    .search-bar input {
-        font-size: 16px;
-        min-height: 44px;
-    }
-    .search-status > span {
-        display: none;
-    }
-    .search-results {
-        max-height: calc(100dvh - 168px);
-    }
-    .search-result {
-        padding: 13px 10px;
     }
     .document-footer {
         font-size: 10px;
@@ -598,10 +428,12 @@ body:has(dialog[open]) {
     .topbar,
     .sidebar,
     .page-toc,
-    .document-tools,
+    .document-actions,
     .document-context,
     .document-footer,
-    .mobile-toc,
+    .reading-bar,
+    .search-context,
+    .document-pagination,
     dialog {
         display: none !important;
     }
@@ -627,11 +459,6 @@ body:has(dialog[open]) {
     --blue: #8eb5ff;
     --blue-soft: #283d60;
 }
-.search-result mark {
-    color: var(--ink);
-    background: var(--blue-soft);
-    font-weight: 650;
-}
 @media print {
     :root,
     :root[data-theme='dark'] {
@@ -649,15 +476,12 @@ body:has(dialog[open]) {
     flex-shrink: 0;
     vertical-align: middle;
 }
-.document-tools button,
+.document-actions button,
 .copy-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-}
-.document-tools .icon {
-    display: none;
 }
 button:disabled {
     cursor: default;

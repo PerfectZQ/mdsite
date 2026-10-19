@@ -1,6 +1,6 @@
 {
   "name": "mdsite",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Turn Markdown in any project into a searchable, self-contained documentation UI.",
   "license": "UNLICENSED",
   "repository": {

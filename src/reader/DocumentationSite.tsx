@@ -1,8 +1,12 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {Navigation} from './DocumentNavigation'
 import {MarkdownDocument} from './MarkdownDocument'
-import {Search} from './Search'
-import {documentHref, readRoute} from './navigation'
+import {DocumentActions} from './DocumentActions'
+import {DocumentPagination} from './DocumentPagination'
+import {ReadingPreferences} from './ReadingPreferences'
+import {MobileChapters, PageOutline} from './TableOfContents'
+import {SearchDialog} from './search/SearchDialog'
+import {documentHref, readingOffset, readRoute} from './navigation'
 import type {Catalog} from '../catalog.ts'
 import {useTheme} from './theme'
 
@@ -21,7 +25,8 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
         () => catalog.documents.find(document => document.path === documentPath),
         [catalog, documentPath],
     )
-    const headings = current?.headings.filter(heading => heading.level <= 3) ?? []
+    const headings = useMemo(() => current?.headings.filter(heading => heading.level <= 3) ?? [], [current])
+    const outline = {path: current?.path || '', headings, activeHeading}
 
     useEffect(() => {
         const change = () => {
@@ -61,29 +66,38 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
 
     useEffect(() => {
         document.title = `${current?.title || catalog.title} · 文档`
-        if (!route.heading) {
+        if (!route.heading && !route.query) {
             window.scrollTo(0, 0)
             content.current?.focus({preventScroll: true})
         }
-        setActiveHeading(route.heading)
     }, [current, catalog.title, route.heading])
 
     useEffect(() => {
-        if (!current) return
-        const headings = current.headings
+        const elements = headings
             .map(heading => document.getElementById(heading.id))
             .filter((element): element is HTMLElement => !!element)
-        const observer = new IntersectionObserver(
-            () => {
+        let frame = 0
+        const update = () => {
+            cancelAnimationFrame(frame)
+            frame = requestAnimationFrame(() => {
+                const offset = readingOffset() + 4
                 const visible =
-                    headings.filter(heading => heading.getBoundingClientRect().top <= 150).at(-1) || headings[0]
-                if (visible) setActiveHeading(visible.id)
-            },
-            {rootMargin: '-70px 0px -65% 0px'},
-        )
-        headings.forEach(heading => observer.observe(heading))
-        return () => observer.disconnect()
-    }, [current, theme])
+                    elements.filter(element => element.getBoundingClientRect().top <= offset).at(-1) || elements[0]
+                setActiveHeading(visible?.id || '')
+            })
+        }
+        const observer = new ResizeObserver(update)
+        if (content.current) observer.observe(content.current)
+        window.addEventListener('scroll', update, {passive: true})
+        window.addEventListener('resize', update)
+        update()
+        return () => {
+            cancelAnimationFrame(frame)
+            observer.disconnect()
+            window.removeEventListener('scroll', update)
+            window.removeEventListener('resize', update)
+        }
+    }, [headings])
 
     const revealPath = (path: string) => {
         setRevealRequest({path})
@@ -123,6 +137,7 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
                     <span>搜索文档…</span>
                     <kbd>⌘ K</kbd>
                 </button>
+                <ReadingPreferences />
                 <button
                     className="theme-toggle"
                     onClick={toggle}
@@ -136,15 +151,12 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
                     onClick={() => mobileNavigation.current?.showModal()}
                     aria-label="打开文档目录"
                 >
-                    目录 ☰
+                    文档 ☰
                 </button>
             </header>
+            <MobileChapters {...outline} />
             <aside className="sidebar">
-                <Navigation
-                    catalog={catalog}
-                    selected={selectedPath === '' ? catalog.home : selectedPath}
-                    revealRequest={revealRequest}
-                />
+                <Navigation catalog={catalog} selected={selectedPath} revealRequest={revealRequest} />
                 <div className="sidebar-footer">{catalog.documents.length} 篇文档</div>
             </aside>
             <div className="page-layout">
@@ -160,48 +172,54 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
                     {current ? (
                         <>
                             <div className="document-context">
-                                <a href="#/">{catalog.rootName}</a>
-                                {current.path.includes('/') && (
-                                    <>
-                                        <span aria-hidden="true">/</span>
-                                        <span>{current.path.slice(0, current.path.lastIndexOf('/'))}</span>
-                                    </>
-                                )}
+                                <span className="document-breadcrumb">
+                                    <a href="#/">{catalog.rootName}</a>
+                                    {current.path.includes('/') && (
+                                        <> / {current.path.slice(0, current.path.lastIndexOf('/'))}</>
+                                    )}
+                                </span>
                                 <span className="reading-time">
                                     约 {Math.max(1, Math.ceil(current.words / 650))} 分钟
                                 </span>
+                                <DocumentActions
+                                    key={current.path}
+                                    document={current}
+                                    onLocate={() => revealPath(selectedPath)}
+                                />
                             </div>
-                            {headings.length > 0 && (
-                                <details className="mobile-toc">
-                                    <summary>本页目录</summary>
-                                    <nav aria-label="本页章节目录">
-                                        {headings.map(heading => (
-                                            <a
-                                                className={`toc-level-${heading.level}`}
-                                                key={heading.id}
-                                                aria-current={activeHeading === heading.id ? 'location' : undefined}
-                                                href={documentHref(current.path, heading.id)}
-                                                onClick={event => {
-                                                    event.currentTarget.closest('details')?.removeAttribute('open')
-                                                    document
-                                                        .getElementById(heading.id)
-                                                        ?.scrollIntoView({block: 'start'})
-                                                }}
-                                            >
-                                                {heading.title}
-                                            </a>
-                                        ))}
-                                    </nav>
-                                </details>
+                            {route.query && (
+                                <div className="search-context" role="status">
+                                    <span>
+                                        搜索：<strong>{route.query}</strong>
+                                    </span>
+                                    <button
+                                        onClick={() => {
+                                            history.replaceState(
+                                                history.state,
+                                                '',
+                                                documentHref(selectedPath, route.heading),
+                                            )
+                                            setRoute(readRoute())
+                                        }}
+                                    >
+                                        清除高亮
+                                    </button>
+                                </div>
                             )}
                             <MarkdownDocument
                                 key={current.path}
                                 document={current}
-                                heading={route.heading}
+                                route={route}
                                 theme={theme}
                                 onSourceLink={onSourceLink}
-                                onLocate={() => revealPath(selectedPath)}
                             />
+                            <DocumentPagination catalog={catalog} selected={selectedPath} />
+                            <footer className="document-footer">
+                                <code>{current.path}</code>
+                                <a href={documentHref(current.path)} onClick={() => window.scrollTo(0, 0)}>
+                                    返回文首 ↑
+                                </a>
+                            </footer>
                         </>
                     ) : (
                         <section className="not-found">
@@ -216,28 +234,16 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
                         </section>
                     )}
                 </main>
-                {current && headings.length > 0 && (
-                    <aside className="page-toc">
-                        <strong>本页目录</strong>
-                        <nav aria-label="章节目录">
-                            {headings.map(heading => (
-                                <a
-                                    className={`toc-level-${heading.level}`}
-                                    key={heading.id}
-                                    aria-current={activeHeading === heading.id ? 'location' : undefined}
-                                    href={documentHref(current.path, heading.id)}
-                                    onClick={() =>
-                                        document.getElementById(heading.id)?.scrollIntoView({block: 'start'})
-                                    }
-                                >
-                                    {heading.title}
-                                </a>
-                            ))}
-                        </nav>
-                    </aside>
-                )}
+                {current && <PageOutline {...outline} />}
             </div>
-            <Search catalog={catalog} dialogRef={search} />
+            <SearchDialog
+                catalog={catalog}
+                dialogRef={search}
+                onSelect={href => {
+                    // Re-selecting the same result must reveal it again, even without a hashchange.
+                    if (window.location.hash === href) setRoute(readRoute())
+                }}
+            />
             <dialog
                 className="navigation-dialog"
                 ref={mobileNavigation}
@@ -254,7 +260,7 @@ export function DocumentationSite({catalog}: {catalog: Catalog}) {
                 </div>
                 <Navigation
                     catalog={catalog}
-                    selected={selectedPath === '' ? catalog.home : selectedPath}
+                    selected={selectedPath}
                     revealRequest={revealRequest}
                     onNavigate={() => mobileNavigation.current?.close()}
                 />

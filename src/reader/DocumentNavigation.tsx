@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent} from 'react'
-import {documentHref} from './navigation'
+import {comparePaths, documentHref} from './navigation'
 import {Icon} from './Icon'
 import type {Catalog} from '../catalog.ts'
 
@@ -12,7 +12,7 @@ interface Entry {
 
 function directoryTree(paths: string[]) {
     const root: Entry = {path: '', name: '', folder: true, children: []}
-    for (const path of [...new Set(paths)].sort((a, b) => a.localeCompare(b, 'en'))) {
+    for (const path of [...new Set(paths)].sort(comparePaths)) {
         const parts = path.split('/')
         let parent = root
         parts.forEach((name, index) => {
@@ -56,6 +56,7 @@ export function Navigation({
         () => directoryTree([...catalog.documents.map(document => document.path), ...Object.keys(catalog.aliases)]),
         [catalog],
     )
+    const documents = useMemo(() => new Map(catalog.documents.map(document => [document.path, document])), [catalog])
     const rows: (Entry & {depth: number; position: number; size: number})[] = []
     const visit = (parent: Entry, depth: number) => {
         const children = [...parent.children].sort((a, b) => Number(b.folder) - Number(a.folder))
@@ -167,6 +168,9 @@ export function Navigation({
             </div>
             <div className="nav-tree" role="tree" aria-label="项目文件">
                 {rows.map((entry, index) => {
+                    const title = documents.get(catalog.aliases[entry.path] || entry.path)?.title
+                    const showTitle =
+                        title && title.toLocaleLowerCase() !== entry.name.replace(/\.md$/i, '').toLocaleLowerCase()
                     const props = {
                         className: `tree-row${entry.folder ? ' tree-folder' : ' tree-file'}`,
                         role: 'treeitem',
@@ -176,7 +180,9 @@ export function Navigation({
                         'aria-selected': selected === entry.path,
                         tabIndex: focusPath === entry.path ? 0 : -1,
                         'data-path': entry.path,
-                        title: entry.path,
+                        title: [entry.path, showTitle ? title : ''].filter(Boolean).join('\n'),
+                        'aria-label': entry.name,
+                        'aria-description': showTitle ? title : undefined,
                         style: {'--depth': entry.depth - 1} as CSSProperties,
                         onFocus: () => setFocused(entry.path),
                         onKeyDown: (event: KeyboardEvent<HTMLElement>) => keyboard(event, entry, index),
@@ -190,7 +196,10 @@ export function Navigation({
                             </span>
                             <span className="tree-chevron">{entry.folder && <Icon name="chevron" />}</span>
                             <Icon name={entry.folder ? 'folder' : 'markdown'} />
-                            <span className="tree-name">{entry.name}</span>
+                            <span className="tree-name">
+                                <span className="tree-filename">{entry.name}</span>
+                                {showTitle && <span className="tree-title">{title}</span>}
+                            </span>
                         </>
                     )
                     return entry.folder ? (

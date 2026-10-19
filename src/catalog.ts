@@ -10,7 +10,7 @@ export interface DocumentRecord {
     summary: string
     html: string
     headings: Heading[]
-    text: string
+    sections: {heading: string; text: string}[]
     words: number
     source: string
 }

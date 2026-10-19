@@ -1,30 +1,35 @@
 import {useDeferredValue, useMemo, useRef, useState} from 'react'
-import {documentHref, searchDocuments} from './navigation'
-import type {Catalog, DocumentRecord} from '../catalog.ts'
+import {documentHref} from '../navigation'
+import {createSearchIndex, searchSections, searchExcerpt, searchPattern} from './search'
+import type {Catalog} from '../../catalog.ts'
+import './search.css'
 
 function Highlight({text, query}: {text: string; query: string}) {
-    const terms = query
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)
-        .map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    if (!terms.length) return <>{text}</>
-    const pattern = new RegExp(`(${terms.join('|')})`, 'gi')
-    return <>{text.split(pattern).map((part, i) => (i % 2 ? <mark key={i}>{part}</mark> : part))}</>
+    const pattern = searchPattern(query)
+    if (!pattern) return <>{text}</>
+    return (
+        <>
+            {text
+                .split(new RegExp(`(${pattern.source})`, 'gi'))
+                .map((part, i) => (i % 2 ? <mark key={i}>{part}</mark> : part))}
+        </>
+    )
 }
 
-function excerpt(document: DocumentRecord, query: string) {
-    const first = query.trim().toLocaleLowerCase().split(/\s+/)[0]
-    const index = first ? document.text.toLocaleLowerCase().indexOf(first) : -1
-    if (index < 0) return document.summary
-    const start = Math.max(0, index - 35)
-    return `${start > 0 ? '…' : ''}${document.text.slice(start, start + 150)}…`
-}
-
-export function Search({catalog, dialogRef}: {catalog: Catalog; dialogRef: React.RefObject<HTMLDialogElement | null>}) {
+export function SearchDialog({
+    catalog,
+    dialogRef,
+    onSelect,
+}: {
+    catalog: Catalog
+    dialogRef: React.RefObject<HTMLDialogElement | null>
+    onSelect: (href: string) => void
+}) {
     const [query, setQuery] = useState('')
     const deferredQuery = useDeferredValue(query)
-    const results = useMemo(() => searchDocuments(catalog.documents, deferredQuery), [catalog, deferredQuery])
+    const index = useMemo(() => createSearchIndex(catalog.documents), [catalog])
+    const results = useMemo(() => searchSections(index, deferredQuery), [index, deferredQuery])
+    const documentCount = new Set(results.map(result => result.document.path)).size
     const input = useRef<HTMLInputElement>(null)
     return (
         <dialog
@@ -74,30 +79,53 @@ export function Search({catalog, dialogRef}: {catalog: Catalog; dialogRef: React
                 </button>
             </div>
             <div className="search-status" aria-live="polite">
-                {query.trim() ? `${results.length} 篇匹配文档` : `全部 ${results.length} 篇文档`}
+                {deferredQuery.trim()
+                    ? `${results.length} 处匹配 · ${documentCount} 篇文档`
+                    : `全部 ${documentCount} 篇文档`}
                 <span>↑ ↓ 选择 · Enter 打开</span>
             </div>
             <div className="search-results">
                 {results.length === 0 && (
                     <p className="empty-message">没有找到匹配文档。试试模块名称或更短的关键词。</p>
                 )}
-                {results.slice(0, 80).map(document => (
+                {results.slice(0, 80).map(result => (
                     <a
                         className="search-result"
-                        key={document.path}
-                        href={documentHref(document.path)}
-                        onClick={() => dialogRef.current?.close()}
+                        key={`${result.document.path}#${result.heading}`}
+                        href={documentHref(
+                            result.document.path,
+                            deferredQuery.trim() ? result.heading : '',
+                            deferredQuery,
+                        )}
+                        onClick={event => {
+                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+                            dialogRef.current?.close()
+                            onSelect(event.currentTarget.hash)
+                        }}
                     >
                         <strong>
-                            <Highlight text={document.title} query={deferredQuery} />
+                            <Highlight text={result.document.title} query={deferredQuery} />
                         </strong>
-                        <code>{document.path}</code>
+                        {deferredQuery.trim() && result.trail && (
+                            <span className="search-section">
+                                <Highlight text={result.trail} query={deferredQuery} />
+                            </span>
+                        )}
+                        <code>
+                            <Highlight text={result.document.path} query={deferredQuery} />
+                        </code>
                         <p>
-                            <Highlight text={excerpt(document, deferredQuery)} query={deferredQuery} />
+                            <Highlight
+                                text={searchExcerpt(
+                                    deferredQuery.trim() ? result.text : result.document.summary,
+                                    deferredQuery,
+                                )}
+                                query={deferredQuery}
+                            />
                         </p>
                     </a>
                 ))}
-                {results.length > 80 && <p className="empty-message">已显示前 80 篇，请输入关键词缩小范围。</p>}
+                {results.length > 80 && <p className="empty-message">已显示前 80 处匹配，请输入关键词缩小范围。</p>}
             </div>
         </dialog>
     )

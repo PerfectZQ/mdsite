@@ -4,6 +4,7 @@ import type {Catalog} from '../catalog.ts'
 import './style.css'
 import './navigation.css'
 import './markdown.css'
+import './reading.css'
 
 const catalog: Catalog = JSON.parse(document.getElementById('documentation')!.textContent!)
 createRoot(document.getElementById('root')!).render(<DocumentationSite catalog={catalog} />)

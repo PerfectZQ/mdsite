@@ -1,5 +1,5 @@
 .markdown-body {
-    font-size: 14px;
+    font-size: var(--reader-font-size);
     line-height: 1.85;
     overflow-wrap: anywhere;
 }
@@ -14,7 +14,7 @@
 .markdown-body h6 {
     line-height: 1.45;
     color: var(--ink);
-    scroll-margin-top: calc(var(--topbar-height) + 26px);
+    scroll-margin-top: calc(var(--topbar-height) + var(--chapters-height, 0px) + 26px);
 }
 .markdown-body h1 {
     font-size: 29px;
@@ -73,7 +73,7 @@
     background: var(--subtle);
     border-radius: 7px;
     overflow-x: auto;
-    font-size: 12px;
+    font-size: var(--reader-code-size);
     line-height: 1.7;
     tab-size: 4;
     scrollbar-width: thin;
@@ -294,7 +294,7 @@
     color: var(--muted);
     opacity: 0.5;
     font-size: 10px;
-    line-height: 20.4px;
+    line-height: calc(var(--reader-code-size) * 1.7);
     font-variant-numeric: tabular-nums;
     user-select: none;
     -webkit-user-select: none;
@@ -442,10 +442,6 @@
     color: var(--muted);
 }
 @media (max-width: 760px) {
-    .markdown-body {
-        font-size: 14px;
-        line-height: 1.85;
-    }
     .markdown-body h1 {
         font-size: 25px;
         line-height: 1.4;
@@ -458,7 +454,6 @@
     }
     .markdown-body pre {
         padding: 16px;
-        font-size: 11px;
     }
     .markdown-body th,
     .markdown-body td {
@@ -480,7 +475,6 @@
     }
     .code-line-number::before {
         width: 30px;
-        line-height: 18.7px;
     }
     .diagram-canvas {
         padding: 20px;
